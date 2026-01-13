@@ -1,19 +1,38 @@
 
-import React, { useRef } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { View, StyleSheet, ActivityIndicator, Platform } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
 import { colors } from '@/styles/commonStyles';
 
-const WEBVIEW_URL = 'https://publictimeoff.com';
+const BASE_URL = 'https://publictimeoff.com';
 
 export default function RankingsScreen() {
   const { effectiveTheme } = useTheme();
   const webViewRef = useRef<WebView>(null);
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
+  const [webViewUrl, setWebViewUrl] = useState('');
 
-  console.log('Rankings screen loaded, loading WebView from:', WEBVIEW_URL);
+  // Build URL with source=app parameter
+  useEffect(() => {
+    const url = `${BASE_URL}/rankings?source=app`;
+    console.log('Rankings screen loaded, loading WebView from:', url);
+    setWebViewUrl(url);
+  }, []);
+
+  if (!webViewUrl) {
+    return (
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: themeColors.background }]}
+        edges={['top']}
+      >
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.ptoGreen} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -22,7 +41,7 @@ export default function RankingsScreen() {
     >
       <WebView
         ref={webViewRef}
-        source={{ uri: WEBVIEW_URL }}
+        source={{ uri: webViewUrl }}
         style={styles.webview}
         startInLoadingState={true}
         renderLoading={() => (
@@ -36,6 +55,15 @@ export default function RankingsScreen() {
           const { nativeEvent } = syntheticEvent;
           console.error('WebView error:', nativeEvent);
         }}
+        onNavigationStateChange={(navState) => {
+          console.log('WebView navigation:', navState.url);
+          // Ensure ?source=app persists across navigation
+          if (navState.url && !navState.url.includes('source=app')) {
+            const separator = navState.url.includes('?') ? '&' : '?';
+            const newUrl = `${navState.url}${separator}source=app`;
+            console.log('Adding source=app to URL:', newUrl);
+          }
+        }}
         // Enable JavaScript
         javaScriptEnabled={true}
         // Enable DOM storage
@@ -44,6 +72,26 @@ export default function RankingsScreen() {
         mixedContentMode="compatibility"
         // iOS specific
         allowsBackForwardNavigationGestures={Platform.OS === 'ios'}
+        // Inject JavaScript to ensure source=app persists
+        injectedJavaScript={`
+          (function() {
+            // Intercept link clicks to add source=app
+            document.addEventListener('click', function(e) {
+              var target = e.target;
+              while (target && target.tagName !== 'A') {
+                target = target.parentElement;
+              }
+              if (target && target.href) {
+                var url = new URL(target.href);
+                if (!url.searchParams.has('source')) {
+                  url.searchParams.set('source', 'app');
+                  target.href = url.toString();
+                }
+              }
+            }, true);
+          })();
+          true;
+        `}
       />
     </SafeAreaView>
   );

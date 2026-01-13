@@ -26,7 +26,7 @@ export default function AccountScreen() {
     dateJoined: 'January 2024',
   });
 
-  const handleThemeChange = async (mode: 'light' | 'dark' | 'system') => {
+  const handleThemeChange = async (mode: 'light' | 'dark') => {
     console.log('User changed theme to:', mode);
     await setThemeMode(mode);
   };
@@ -36,21 +36,12 @@ export default function AccountScreen() {
     await setLanguage(lang);
   };
 
-  const handleStravaConnect = async () => {
-    console.log('User tapped Connect Strava button');
-    // TODO: Backend Integration - Implement Strava OAuth flow
-    // This will need a backend endpoint to handle OAuth callback
-    Alert.alert(
-      'Strava Integration',
-      'Strava OAuth integration will be implemented with backend support.',
-      [{ text: 'OK' }]
-    );
-  };
-
   const handleLinkPress = async (url: string, title: string) => {
     console.log('User tapped link:', title, url);
     try {
-      await WebBrowser.openBrowserAsync(`https://publictimeoff.com${url}`);
+      // Add ?source=app to all links
+      const fullUrl = `https://publictimeoff.com${url}?source=app`;
+      await WebBrowser.openBrowserAsync(fullUrl);
     } catch (error) {
       console.error('Error opening browser:', error);
     }
@@ -90,12 +81,9 @@ export default function AccountScreen() {
       theme: 'Theme',
       light: 'Light',
       dark: 'Dark',
-      system: 'System Default',
       language: 'Language',
       english: 'English',
       french: 'French',
-      strava: 'Strava Integration',
-      connectStrava: 'Connect Strava',
       links: 'Links',
       support: 'Support',
       leagueRules: 'League Rules',
@@ -111,12 +99,9 @@ export default function AccountScreen() {
       theme: 'Thème',
       light: 'Clair',
       dark: 'Sombre',
-      system: 'Système par défaut',
       language: 'Langue',
       english: 'Anglais',
       french: 'Français',
-      strava: 'Intégration Strava',
-      connectStrava: 'Connecter Strava',
       links: 'Liens',
       support: 'Support',
       leagueRules: 'Règles de la ligue',
@@ -175,13 +160,13 @@ export default function AccountScreen() {
             {strings.settings}
           </Text>
 
-          {/* Theme Toggle */}
+          {/* Theme Toggle - Only Light and Dark */}
           <View style={[styles.card, { backgroundColor: themeColors.card }]}>
             <Text style={[styles.settingLabel, { color: themeColors.foreground }]}>
               {strings.theme}
             </Text>
             <View style={styles.toggleGroup}>
-              {(['light', 'dark', 'system'] as const).map((mode) => (
+              {(['light', 'dark'] as const).map((mode) => (
                 <TouchableOpacity
                   key={mode}
                   style={[
@@ -246,19 +231,6 @@ export default function AccountScreen() {
               ))}
             </View>
           </View>
-        </View>
-
-        {/* Strava Integration */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: themeColors.foreground }]}>
-            {strings.strava}
-          </Text>
-          <TouchableOpacity
-            style={[commonStyles.button, commonStyles.buttonPrimary]}
-            onPress={handleStravaConnect}
-          >
-            <Text style={commonStyles.buttonText}>{strings.connectStrava}</Text>
-          </TouchableOpacity>
         </View>
 
         {/* Links */}

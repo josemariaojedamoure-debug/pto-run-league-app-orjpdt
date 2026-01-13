@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-type ThemeMode = 'light' | 'dark' | 'system';
+type ThemeMode = 'light' | 'dark';
 type Language = 'en' | 'fr';
 
 interface ThemeContextType {
@@ -21,7 +21,7 @@ const LANGUAGE_STORAGE_KEY = '@pto_language';
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const systemColorScheme = useColorScheme();
-  const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
+  const [themeMode, setThemeModeState] = useState<ThemeMode>('light');
   const [language, setLanguageState] = useState<Language>('en');
   const [isLoading, setIsLoading] = useState(true);
 
@@ -38,7 +38,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
         AsyncStorage.getItem(LANGUAGE_STORAGE_KEY),
       ]);
 
-      if (savedTheme) {
+      if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark')) {
         setThemeModeState(savedTheme as ThemeMode);
         console.log('Loaded theme preference:', savedTheme);
       }
@@ -73,13 +73,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Calculate effective theme based on mode and system preference
-  const effectiveTheme: 'light' | 'dark' =
-    themeMode === 'system'
-      ? systemColorScheme === 'dark'
-        ? 'dark'
-        : 'light'
-      : themeMode;
+  // effectiveTheme is now always the selected theme (no system default)
+  const effectiveTheme: 'light' | 'dark' = themeMode;
 
   if (isLoading) {
     return null; // Or a loading screen
