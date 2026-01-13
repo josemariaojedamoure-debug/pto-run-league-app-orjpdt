@@ -1,4 +1,3 @@
-
 {
   "expo": {
     "name": "PTO Run League",
@@ -59,7 +58,8 @@
       "router": {},
       "eas": {
         "projectId": "your-project-id"
-      }
+      },
+      "backendUrl": "https://fz2p8w6pysxtv25hyuzyxy4ev67xc6kh.app.specular.dev"
     }
   }
 }
