@@ -1,11 +1,10 @@
 
 import React, { useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Platform, ScrollView, Text, TouchableOpacity, Image } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Platform, ScrollView, Text, TouchableOpacity, Image, Alert } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
 import { colors, typography, spacing } from '@/styles/commonStyles';
-import * as WebBrowser from 'expo-web-browser';
 
 const BASE_URL = 'https://publictimeoff.com';
 const STRAVA_CLIENT_ID = '183997';
@@ -15,6 +14,7 @@ export default function DashboardScreen() {
   const webViewRef = useRef<WebView>(null);
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
   const [webViewUrl, setWebViewUrl] = useState('');
+  const [showNativeCard, setShowNativeCard] = useState(true);
 
   // Placeholder user data - TODO: Backend Integration - GET /api/user to fetch user info
   const [userData] = useState({
@@ -30,33 +30,24 @@ export default function DashboardScreen() {
     setWebViewUrl(url);
   }, []);
 
-  const handleStravaConnect = async () => {
+  const handleStravaConnect = () => {
     console.log('User tapped Connect to Strava button');
-    try {
-      // Build Strava OAuth URL with correct redirect_uri
-      const redirectUri = encodeURIComponent(`${BASE_URL}/participant?source=app`);
-      const stravaAuthUrl = `https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&response_type=code&redirect_uri=${redirectUri}&approval_prompt=force&scope=activity:read_all,profile:read_all&state=${userData.profileId}`;
-      
-      console.log('Opening Strava OAuth URL:', stravaAuthUrl);
-      
-      // Open Strava OAuth in browser
-      // If user has Strava app installed, they will be prompted to open it
-      const result = await WebBrowser.openBrowserAsync(stravaAuthUrl);
-      
-      console.log('Strava OAuth result:', result);
-      
-      // After OAuth completes and user returns, refresh the WebView
-      if (result.type === 'cancel' || result.type === 'dismiss') {
-        console.log('User closed Strava OAuth browser');
-      }
-      
-      // Refresh WebView to show updated connection status
-      if (webViewRef.current) {
-        console.log('Refreshing WebView after Strava OAuth');
-        webViewRef.current.reload();
-      }
-    } catch (error) {
-      console.error('Error opening Strava OAuth:', error);
+    
+    // Build Strava OAuth URL with correct redirect_uri
+    const redirectUri = encodeURIComponent(`${BASE_URL}/participant?source=app`);
+    const stravaAuthUrl = `https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&response_type=code&redirect_uri=${redirectUri}&approval_prompt=force&scope=activity:read_all,profile:read_all&state=${userData.profileId}`;
+    
+    console.log('Navigating WebView to Strava OAuth URL:', stravaAuthUrl);
+    
+    // Hide the native card and navigate the WebView to Strava OAuth
+    // This keeps everything within the WebView, so the redirect comes back to the WebView
+    setShowNativeCard(false);
+    
+    if (webViewRef.current) {
+      webViewRef.current.injectJavaScript(`
+        window.location.href = '${stravaAuthUrl}';
+        true;
+      `);
     }
   };
 
@@ -81,6 +72,37 @@ export default function DashboardScreen() {
 
   const strings = t[language];
 
+  const handleWebViewNavigationStateChange = (navState: any) => {
+    console.log('WebView navigation:', navState.url);
+    
+    // Check if we're back on the participant page (after OAuth redirect)
+    if (navState.url.includes('/participant')) {
+      console.log('Back on participant page, showing native card again');
+      setShowNativeCard(true);
+      
+      // Check if there's a code parameter (successful OAuth)
+      if (navState.url.includes('code=')) {
+        console.log('OAuth code detected in URL, Strava connection successful');
+      }
+      
+      // Check if there's an error parameter (failed OAuth)
+      if (navState.url.includes('error=')) {
+        console.log('OAuth error detected in URL');
+        const urlParams = new URLSearchParams(navState.url.split('?')[1]);
+        const error = urlParams.get('error');
+        const errorDescription = urlParams.get('error_description');
+        console.error('Strava OAuth error:', error, errorDescription);
+      }
+    }
+    
+    // Ensure ?source=app persists across navigation
+    if (navState.url && !navState.url.includes('source=app') && !navState.url.includes('strava.com')) {
+      const separator = navState.url.includes('?') ? '&' : '?';
+      const newUrl = `${navState.url}${separator}source=app`;
+      console.log('Adding source=app to URL:', newUrl);
+    }
+  };
+
   if (!webViewUrl) {
     return (
       <SafeAreaView
@@ -102,69 +124,74 @@ export default function DashboardScreen() {
       <ScrollView 
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        scrollEnabled={showNativeCard}
       >
-        {/* Welcome Text Section */}
-        <View style={styles.welcomeSection}>
-          <Text style={[styles.welcomeTitle, { color: themeColors.foreground }]}>
-            {strings.welcome}, {userData.name}
-          </Text>
-          <Text style={[styles.companyName, { color: themeColors.mutedText || themeColors.secondaryText }]}>
-            {userData.company}
-          </Text>
-          <Text style={[styles.welcomeSubtitle, { color: themeColors.mutedText || themeColors.secondaryText }]}>
-            {strings.trackPerformance}
-          </Text>
-        </View>
-
-        {/* Native Strava Integration Card - Matching Performance Profile Design */}
-        <View style={[
-          styles.stravaCard, 
-          { 
-            backgroundColor: themeColors.card,
-            borderColor: effectiveTheme === 'dark' ? themeColors.border : 'hsl(220, 13%, 88%)',
-          }
-        ]}>
-          {/* Card Header */}
-          <View style={styles.cardHeader}>
-            <Text style={[styles.cardTitle, { color: themeColors.foreground }]}>
-              {strings.performanceProfile}
+        {/* Welcome Text Section - Only show when native card is visible */}
+        {showNativeCard && (
+          <View style={styles.welcomeSection}>
+            <Text style={[styles.welcomeTitle, { color: themeColors.foreground }]}>
+              {strings.welcome}, {userData.name}
             </Text>
-            <Text style={[styles.cardDescription, { color: themeColors.mutedText || themeColors.secondaryText }]}>
-              {strings.connectStravaDescription}
+            <Text style={[styles.companyName, { color: themeColors.mutedText || themeColors.secondaryText }]}>
+              {userData.company}
+            </Text>
+            <Text style={[styles.welcomeSubtitle, { color: themeColors.mutedText || themeColors.secondaryText }]}>
+              {strings.trackPerformance}
             </Text>
           </View>
+        )}
 
-          {/* Card Content */}
-          <View style={styles.cardContent}>
-            <View style={styles.cardInnerContent}>
-              {/* "Connect to Strava" text - same font size and design as "Performance Profile" */}
-              <Text style={[styles.connectToStravaText, { color: themeColors.foreground }]}>
-                {strings.connectToStrava}
+        {/* Native Strava Integration Card - Only show when not in OAuth flow */}
+        {showNativeCard && (
+          <View style={[
+            styles.stravaCard, 
+            { 
+              backgroundColor: themeColors.card,
+              borderColor: effectiveTheme === 'dark' ? themeColors.border : 'hsl(220, 13%, 88%)',
+            }
+          ]}>
+            {/* Card Header */}
+            <View style={styles.cardHeader}>
+              <Text style={[styles.cardTitle, { color: themeColors.foreground }]}>
+                {strings.performanceProfile}
               </Text>
-
-              {/* Connect to Strava Button */}
-              <TouchableOpacity 
-                onPress={handleStravaConnect}
-                activeOpacity={0.8}
-                style={styles.stravaButton}
-              >
-                <Image
-                  source={require('@/assets/images/3f593887-3444-43e9-8d1b-f35da33e1638.png')}
-                  style={styles.stravaButtonImage}
-                  resizeMode="contain"
-                />
-              </TouchableOpacity>
-
-              {/* Description Text */}
-              <Text style={[styles.stravaDescription, { color: themeColors.mutedText || themeColors.secondaryText }]}>
-                {strings.runningDataEnables}
+              <Text style={[styles.cardDescription, { color: themeColors.mutedText || themeColors.secondaryText }]}>
+                {strings.connectStravaDescription}
               </Text>
             </View>
+
+            {/* Card Content */}
+            <View style={styles.cardContent}>
+              <View style={styles.cardInnerContent}>
+                {/* "Connect to Strava" text - same font size and design as "Performance Profile" */}
+                <Text style={[styles.connectToStravaText, { color: themeColors.foreground }]}>
+                  {strings.connectToStrava}
+                </Text>
+
+                {/* Connect to Strava Button */}
+                <TouchableOpacity 
+                  onPress={handleStravaConnect}
+                  activeOpacity={0.8}
+                  style={styles.stravaButton}
+                >
+                  <Image
+                    source={require('@/assets/images/3f593887-3444-43e9-8d1b-f35da33e1638.png')}
+                    style={styles.stravaButtonImage}
+                    resizeMode="contain"
+                  />
+                </TouchableOpacity>
+
+                {/* Description Text */}
+                <Text style={[styles.stravaDescription, { color: themeColors.mutedText || themeColors.secondaryText }]}>
+                  {strings.runningDataEnables}
+                </Text>
+              </View>
+            </View>
           </View>
-        </View>
+        )}
 
         {/* WebView for participant dashboard */}
-        <View style={styles.webviewContainer}>
+        <View style={[styles.webviewContainer, showNativeCard ? {} : styles.webviewFullScreen]}>
           <WebView
             ref={webViewRef}
             source={{ uri: webViewUrl }}
@@ -181,15 +208,7 @@ export default function DashboardScreen() {
               const { nativeEvent } = syntheticEvent;
               console.error('WebView error:', nativeEvent);
             }}
-            onNavigationStateChange={(navState) => {
-              console.log('WebView navigation:', navState.url);
-              // Ensure ?source=app persists across navigation
-              if (navState.url && !navState.url.includes('source=app')) {
-                const separator = navState.url.includes('?') ? '&' : '?';
-                const newUrl = `${navState.url}${separator}source=app`;
-                console.log('Adding source=app to URL:', newUrl);
-              }
-            }}
+            onNavigationStateChange={handleWebViewNavigationStateChange}
             // Enable JavaScript
             javaScriptEnabled={true}
             // Enable DOM storage
@@ -198,6 +217,9 @@ export default function DashboardScreen() {
             mixedContentMode="compatibility"
             // iOS specific
             allowsBackForwardNavigationGestures={Platform.OS === 'ios'}
+            // Allow third-party cookies for OAuth
+            thirdPartyCookiesEnabled={true}
+            sharedCookiesEnabled={true}
             // Inject JavaScript to ensure source=app persists
             injectedJavaScript={`
               (function() {
@@ -207,7 +229,7 @@ export default function DashboardScreen() {
                   while (target && target.tagName !== 'A') {
                     target = target.parentElement;
                   }
-                  if (target && target.href) {
+                  if (target && target.href && !target.href.includes('strava.com')) {
                     var url = new URL(target.href);
                     if (!url.searchParams.has('source')) {
                       url.searchParams.set('source', 'app');
@@ -221,8 +243,8 @@ export default function DashboardScreen() {
           />
         </View>
 
-        {/* Bottom spacing for tab bar */}
-        <View style={{ height: 80 }} />
+        {/* Bottom spacing for tab bar - only when native card is visible */}
+        {showNativeCard && <View style={{ height: 80 }} />}
       </ScrollView>
     </SafeAreaView>
   );
@@ -321,6 +343,14 @@ const styles = StyleSheet.create({
   webviewContainer: {
     flex: 1,
     minHeight: 600,
+  },
+  webviewFullScreen: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    minHeight: '100%',
   },
   webview: {
     flex: 1,
