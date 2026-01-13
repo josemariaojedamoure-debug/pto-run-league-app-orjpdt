@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "PTO Run League",
-    "slug": "pto-run-league",
+    "slug": "PTO Run League",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/natively-dark.png",
@@ -61,5 +61,6 @@
       },
       "backendUrl": "https://fz2p8w6pysxtv25hyuzyxy4ev67xc6kh.app.specular.dev"
     }
-  }
+  },
+  "scheme": "PTO Run League"
 }

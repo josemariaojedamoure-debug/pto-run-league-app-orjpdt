@@ -20,9 +20,10 @@ export default function AccountScreen() {
   const router = useRouter();
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
 
-  // Placeholder user data - will be replaced with actual data from backend
+  // Placeholder user data - TODO: Backend Integration - GET /api/user to fetch user info
   const [userData] = useState({
-    name: 'John Runner',
+    name: 'Jose Ojeda',
+    company: 'PTO',
     dateJoined: 'January 2024',
   });
 
@@ -76,6 +77,7 @@ export default function AccountScreen() {
       account: 'Account',
       userInfo: 'User Information',
       name: 'Name',
+      company: 'Company',
       dateJoined: 'Date Joined',
       settings: 'Settings',
       theme: 'Theme',
@@ -94,6 +96,7 @@ export default function AccountScreen() {
       account: 'Compte',
       userInfo: 'Informations utilisateur',
       name: 'Nom',
+      company: 'Entreprise',
       dateJoined: 'Date d\'inscription',
       settings: 'Paramètres',
       theme: 'Thème',
@@ -140,6 +143,15 @@ export default function AccountScreen() {
               </Text>
               <Text style={[styles.infoValue, { color: themeColors.foreground }]}>
                 {userData.name}
+              </Text>
+            </View>
+            <View style={[styles.divider, { backgroundColor: themeColors.border }]} />
+            <View style={styles.infoRow}>
+              <Text style={[styles.infoLabel, { color: effectiveTheme === 'dark' ? themeColors.secondaryText : themeColors.foreground }]}>
+                {strings.company}
+              </Text>
+              <Text style={[styles.infoValue, { color: themeColors.foreground }]}>
+                {userData.company}
               </Text>
             </View>
             <View style={[styles.divider, { backgroundColor: themeColors.border }]} />
