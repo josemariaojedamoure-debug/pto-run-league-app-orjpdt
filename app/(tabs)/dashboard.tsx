@@ -59,7 +59,7 @@ export default function DashboardScreen() {
       performanceProfile: 'Profil de performance',
       connectStravaDescription: 'Connectez votre compte Strava pour générer votre score personnalisé',
       connectToStrava: 'Connecter à Strava',
-      runningDataEnables: 'Vos données de course permettent une compétition équitable avec des collègues de tous niveaux de forme physique.',
+      runningDataEnables: 'Vos données de course permettent une compétition équitable avec vos collègues de tous niveaux.',
     },
   };
 
@@ -121,10 +121,10 @@ export default function DashboardScreen() {
           {/* Card Content */}
           <View style={styles.cardContent}>
             <View style={styles.cardInnerContent}>
-              {/* Heartbeat Icon Placeholder */}
-              <View style={styles.iconContainer}>
-                <Text style={styles.heartbeatIcon}>⎯⎯⎯∧⎯∨⎯⎯⎯</Text>
-              </View>
+              {/* "Connect to Strava" text - same font size and design as "Performance Profile" */}
+              <Text style={[styles.connectToStravaText, { color: themeColors.foreground }]}>
+                {strings.connectToStrava}
+              </Text>
 
               {/* Connect to Strava Button */}
               <TouchableOpacity 
@@ -279,13 +279,14 @@ const styles = StyleSheet.create({
     paddingVertical: 24, // py-6 = 24px mobile
     alignItems: 'center',
   },
-  iconContainer: {
+  // "Connect to Strava" text - same font size and design as "Performance Profile"
+  connectToStravaText: {
+    fontSize: 18, // Same as cardTitle (text-lg = 18px mobile)
+    fontWeight: '600', // Same as cardTitle (font-semibold)
+    lineHeight: 18, // Same as cardTitle (leading-none = 1)
+    letterSpacing: -0.025 * 18, // Same as cardTitle (tracking-tight = -0.025em)
     marginBottom: 24,
-  },
-  heartbeatIcon: {
-    fontSize: 48,
-    color: '#C0C0C0',
-    fontWeight: '300',
+    textAlign: 'center',
   },
   stravaButton: {
     width: '100%',

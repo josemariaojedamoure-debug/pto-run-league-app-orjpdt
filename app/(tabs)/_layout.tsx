@@ -36,61 +36,78 @@ export default function TabLayout() {
         <Stack.Screen name="account" />
       </Stack>
 
-      {/* Custom Bottom Tab Bar */}
+      {/* Custom Bottom Tab Bar - Pill Style */}
       <SafeAreaView
         edges={['bottom']}
         style={[
-          styles.tabBar,
-          { backgroundColor: themeColors.tabBarBackground },
+          styles.tabBarContainer,
+          { backgroundColor: themeColors.background },
         ]}
       >
-        {tabs.map((tab) => {
-          const active = isActive(tab.route);
-          return (
-            <TouchableOpacity
-              key={tab.name}
-              style={styles.tabButton}
-              onPress={() => {
-                console.log('User tapped', tab.name, 'tab');
-                router.push(tab.route as any);
-              }}
-            >
-              <Text
+        <View style={[
+          styles.tabBar,
+          { backgroundColor: themeColors.secondaryBackground || themeColors.mutedBackground },
+        ]}>
+          {tabs.map((tab) => {
+            const active = isActive(tab.route);
+            return (
+              <TouchableOpacity
+                key={tab.name}
                 style={[
-                  styles.tabLabel,
-                  {
-                    color: active
-                      ? themeColors.tabBarActive
-                      : themeColors.tabBarInactive,
-                    fontWeight: active ? typography.weights.medium : typography.weights.regular,
+                  styles.tabButton,
+                  active && {
+                    backgroundColor: effectiveTheme === 'dark' ? '#FFFFFF' : '#FFFFFF',
                   },
                 ]}
+                onPress={() => {
+                  console.log('User tapped', tab.name, 'tab');
+                  router.push(tab.route as any);
+                }}
               >
-                {tab.name}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
+                <Text
+                  style={[
+                    styles.tabLabel,
+                    {
+                      color: active
+                        ? (effectiveTheme === 'dark' ? '#000000' : '#000000')
+                        : themeColors.mutedText || themeColors.secondaryText,
+                      fontWeight: active ? typography.weights.medium : typography.weights.regular,
+                    },
+                  ]}
+                >
+                  {tab.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
       </SafeAreaView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  tabBarContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
   tabBar: {
     flexDirection: 'row',
-    height: spacing.tabBarHeight,
-    borderTopWidth: 1,
-    borderTopColor: 'transparent',
-    paddingHorizontal: 8,
+    height: 48,
+    borderRadius: 24,
+    padding: 4,
+    gap: 4,
   },
   tabButton: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
   },
   tabLabel: {
-    fontSize: typography.sizes.tabLabel,
+    fontSize: 14,
     fontFamily: typography.fontFamily,
   },
 });
