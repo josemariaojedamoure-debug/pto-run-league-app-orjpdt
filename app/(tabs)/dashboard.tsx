@@ -8,6 +8,7 @@ import { colors, typography, spacing } from '@/styles/commonStyles';
 import * as WebBrowser from 'expo-web-browser';
 
 const BASE_URL = 'https://publictimeoff.com';
+const STRAVA_CLIENT_ID = '183997';
 
 export default function DashboardScreen() {
   const { effectiveTheme, language } = useTheme();
@@ -19,6 +20,7 @@ export default function DashboardScreen() {
   const [userData] = useState({
     name: 'Jose Ojeda',
     company: 'PTO',
+    profileId: 'user-profile-id', // This should come from actual user data
   });
 
   // Build URL with source=app parameter
@@ -31,12 +33,26 @@ export default function DashboardScreen() {
   const handleStravaConnect = async () => {
     console.log('User tapped Connect to Strava button');
     try {
-      // Open Strava OAuth flow - callback will be handled by publictimeoff.com
-      const stravaAuthUrl = `${BASE_URL}/auth/strava?source=app`;
-      await WebBrowser.openBrowserAsync(stravaAuthUrl);
+      // Build Strava OAuth URL with correct redirect_uri
+      const redirectUri = encodeURIComponent(`${BASE_URL}/participant?source=app`);
+      const stravaAuthUrl = `https://www.strava.com/oauth/authorize?client_id=${STRAVA_CLIENT_ID}&response_type=code&redirect_uri=${redirectUri}&approval_prompt=force&scope=activity:read_all,profile:read_all&state=${userData.profileId}`;
+      
+      console.log('Opening Strava OAuth URL:', stravaAuthUrl);
+      
+      // Open Strava OAuth in browser
+      // If user has Strava app installed, they will be prompted to open it
+      const result = await WebBrowser.openBrowserAsync(stravaAuthUrl);
+      
+      console.log('Strava OAuth result:', result);
       
       // After OAuth completes and user returns, refresh the WebView
+      if (result.type === 'cancel' || result.type === 'dismiss') {
+        console.log('User closed Strava OAuth browser');
+      }
+      
+      // Refresh WebView to show updated connection status
       if (webViewRef.current) {
+        console.log('Refreshing WebView after Strava OAuth');
         webViewRef.current.reload();
       }
     } catch (error) {
