@@ -1,15 +1,15 @@
 
 {
   "expo": {
-    "name": "PTO Running League",
-    "slug": "pto-running-league",
+    "name": "PTO Corporate Running League",
+    "slug": "PTO",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/app-icon.png",
+    "icon": "./assets/images/86248fd5-4ebd-4201-bdd3-b3ac3b8c3fff.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/splash-screen.png",
+      "image": "./assets/images/069c7723-cb12-4fab-9a02-7dd262f099e1.png",
       "resizeMode": "contain",
       "backgroundColor": "#40A060"
     },
@@ -22,6 +22,14 @@
         "NSAppTransportSecurity": {
           "NSExceptionDomains": {
             "publictimeoff.com": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSIncludesSubdomains": true
+            },
+            "www.strava.com": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSIncludesSubdomains": true
+            },
+            "strava.com": {
               "NSExceptionAllowsInsecureHTTPLoads": true,
               "NSIncludesSubdomains": true
             },
@@ -38,11 +46,46 @@
         "NSMotionUsageDescription": "We need motion data to track your running activities.",
         "NSHealthShareUsageDescription": "We need access to your health data to sync your running activities.",
         "NSHealthUpdateUsageDescription": "We need to update your health data with your running activities."
+      },
+      "appStoreMetadata": {
+        "subtitle": "",
+        "description": "The corporate running league where everyone can win.\n\nConnect Strava, get your personalized score, and compete fairly with colleagues from beginner to elite. PTO Corporate Running League rewards progress, not just pace.\n\nYour Score, Your Level\nOur scoring system analyzes your Strava data to create a personalized baseline. You compete against your own potential, not against the office marathon runner. Progress and consistency matter more than raw speed.\n\nKey Features:\n• Browse and register for eligible races\n• Track your score evolution and rankings in real-time\n• Connect Strava for automatic activity sync\n• Compete for individual prizes\n• Win company awards with your team\n• Get race reminders and ranking updates via push notifications\n• Share your achievements on social media\n\nStronger Teams Through Movement\nThe league transforms running into shared competition. Team rankings, individual prizes, and company awards create coffee break conversations at the office. Connect across departments because you're competing together, not just running at the same time.\n\nPrizes Worth Racing For\nIndividual and company awards to reward progress, performance, and commitment. Winners are honored at our end-of-season celebration. Bragging rights guaranteed.\n\nJoin the PTO Corporate Running League and make running a team sport at your workplace!\n\nNote: Your company must be a PTO member to participate.",
+        "keywords": [
+          "running",
+          "corporate",
+          "strava",
+          "league",
+          "fitness",
+          "team",
+          "competition",
+          "wellness",
+          "workplace",
+          "personalized",
+          "progress"
+        ],
+        "promotionalText": "The corporate running league where everyone can win. Connect Strava, get your personalized score, and compete fairly with colleagues from beginner to elite.",
+        "supportURL": "https://publictimeoff.com/support",
+        "marketingURL": "https://publictimeoff.com",
+        "privacyPolicyURL": "https://publictimeoff.com/privacy-policy",
+        "screenshots": {
+          "iphone55": [
+            "./assets/images/c451a1f6-2112-4deb-957d-18ed9bce62d4.png",
+            "./assets/images/2fda04ab-cd29-4352-8172-b3d68729d862.png",
+            "./assets/images/7ca5fdea-8fb5-4876-a80a-1ee2c22137c5.png",
+            "./assets/images/e8c44877-bad6-4c18-bf94-c7f5ec42e588.png"
+          ],
+          "iphone65": [
+            "./assets/images/e2ed83e1-8948-44cb-9229-78c1e86e64ff.png",
+            "./assets/images/8469d42a-e0c4-4e5c-8088-dc2679ed3304.png",
+            "./assets/images/768b125c-3d62-472d-9afb-8f0843041f87.png",
+            "./assets/images/5841af66-762a-4385-b4b9-e2a2bd6b2613.png"
+          ]
+        }
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/app-icon.png",
+        "foregroundImage": "./assets/images/86248fd5-4ebd-4201-bdd3-b3ac3b8c3fff.png",
         "backgroundColor": "#40A060"
       },
       "edgeToEdgeEnabled": true,
@@ -58,7 +101,7 @@
       ]
     },
     "web": {
-      "favicon": "./assets/images/app-icon.png",
+      "favicon": "./assets/images/86248fd5-4ebd-4201-bdd3-b3ac3b8c3fff.png",
       "bundler": "metro"
     },
     "plugins": [
@@ -94,5 +137,6 @@
       "backendUrl": "https://fz2p8w6pysxtv25hyuzyxy4ev67xc6kh.app.specular.dev"
     },
     "privacy": "public"
-  }
+  },
+  "scheme": "PTO"
 }
