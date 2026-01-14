@@ -20,6 +20,7 @@ interface SupabaseContextType {
   signUp: (email: string, password: string, name: string, company: string) => Promise<void>;
   signOut: () => Promise<void>;
   refreshProfile: () => Promise<void>;
+  checkSession: () => Promise<void>;
 }
 
 const SupabaseContext = createContext<SupabaseContextType | undefined>(undefined);
@@ -58,9 +59,21 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
       }
     });
 
+    // Poll for session changes (in case web auth completes)
+    const pollInterval = setInterval(async () => {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      if (currentSession && !session) {
+        console.log('SupabaseProvider: Session detected via polling');
+        setSession(currentSession);
+        setUser(currentSession.user);
+        fetchProfile(currentSession.user.id);
+      }
+    }, 2000); // Check every 2 seconds
+
     return () => {
       console.log('SupabaseProvider: Cleaning up auth listener');
       subscription.unsubscribe();
+      clearInterval(pollInterval);
     };
   }, []);
 
@@ -92,6 +105,17 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
     if (user) {
       console.log('Refreshing user profile');
       await fetchProfile(user.id);
+    }
+  };
+
+  const checkSession = async () => {
+    console.log('Manually checking session');
+    const { data: { session: currentSession } } = await supabase.auth.getSession();
+    if (currentSession) {
+      console.log('Session found during manual check');
+      setSession(currentSession);
+      setUser(currentSession.user);
+      await fetchProfile(currentSession.user.id);
     }
   };
 
@@ -199,6 +223,7 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
         signUp,
         signOut,
         refreshProfile,
+        checkSession,
       }}
     >
       {children}
