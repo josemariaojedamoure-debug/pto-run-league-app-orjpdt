@@ -1,40 +1,64 @@
+
 {
   "expo": {
-    "name": "PTO",
-    "slug": "PTO",
+    "name": "PTO Running League",
+    "slug": "pto-running-league",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/natively-dark.png",
+    "icon": "./assets/images/app-icon.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/natively-dark.png",
+      "image": "./assets/images/splash-screen.png",
       "resizeMode": "contain",
       "backgroundColor": "#40A060"
     },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.publictimeoff.runleague",
+      "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSAppTransportSecurity": {
-          "NSAllowsArbitraryLoads": true
-        }
+          "NSExceptionDomains": {
+            "publictimeoff.com": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSIncludesSubdomains": true
+            },
+            "specular.dev": {
+              "NSExceptionAllowsInsecureHTTPLoads": true,
+              "NSIncludesSubdomains": true
+            }
+          }
+        },
+        "NSUserTrackingUsageDescription": "This app uses tracking to provide personalized running insights and improve your experience.",
+        "NSLocationWhenInUseUsageDescription": "We need your location to track your running activities and show nearby races.",
+        "NSPhotoLibraryUsageDescription": "We need access to your photo library to let you upload profile pictures.",
+        "NSCameraUsageDescription": "We need camera access to let you take profile pictures.",
+        "NSMotionUsageDescription": "We need motion data to track your running activities.",
+        "NSHealthShareUsageDescription": "We need access to your health data to sync your running activities.",
+        "NSHealthUpdateUsageDescription": "We need to update your health data with your running activities."
       }
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/natively-dark.png",
+        "foregroundImage": "./assets/images/app-icon.png",
         "backgroundColor": "#40A060"
       },
       "edgeToEdgeEnabled": true,
       "package": "com.publictimeoff.runleague",
+      "versionCode": 1,
       "permissions": [
-        "android.permission.INTERNET"
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
       ]
     },
     "web": {
-      "favicon": "./assets/images/final_quest_240x240.png",
+      "favicon": "./assets/images/app-icon.png",
       "bundler": "metro"
     },
     "plugins": [
@@ -44,7 +68,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/natively-dark.png",
+          "icon": "./assets/images/notification-icon.png",
           "color": "#40A060",
           "sounds": []
         }
@@ -65,10 +89,10 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "your-project-id"
+        "projectId": "your-project-id-here"
       },
       "backendUrl": "https://fz2p8w6pysxtv25hyuzyxy4ev67xc6kh.app.specular.dev"
-    }
-  },
-  "scheme": "PTO"
+    },
+    "privacy": "public"
+  }
 }
