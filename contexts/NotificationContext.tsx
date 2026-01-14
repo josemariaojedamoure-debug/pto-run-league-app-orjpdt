@@ -46,9 +46,110 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const notificationListener = useRef<Notifications.Subscription>();
   const responseListener = useRef<Notifications.Subscription>();
 
+  // Define refreshNotifications BEFORE it's used in useEffect
+  const refreshNotifications = useCallback(async () => {
+    if (!user) {
+      console.log('NotificationProvider: No user, skipping notification fetch');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      console.log('NotificationProvider: Fetching notifications for user:', user.id);
+      const backendUrl = Constants.expoConfig?.extra?.backendUrl;
+      
+      const response = await fetch(`${backendUrl}/api/notifications?userId=${user.id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        console.error('NotificationProvider: Failed to fetch notifications');
+        return;
+      }
+
+      const data = await response.json();
+      console.log('NotificationProvider: Fetched notifications:', data.length);
+      setNotifications(data);
+    } catch (error) {
+      console.error('NotificationProvider: Error fetching notifications:', error);
+    } finally {
+      setLoading(false);
+    }
+  }, [user]);
+
+  const registerTokenWithBackend = useCallback(async (token: string, userId: string) => {
+    try {
+      console.log('NotificationProvider: Registering push token with backend');
+      const backendUrl = Constants.expoConfig?.extra?.backendUrl;
+      
+      const response = await fetch(`${backendUrl}/api/notifications/register-token`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId,
+          expoPushToken: token,
+          deviceType: Platform.OS,
+        }),
+      });
+
+      if (!response.ok) {
+        console.error('NotificationProvider: Failed to register token with backend');
+      } else {
+        console.log('NotificationProvider: Token registered successfully');
+      }
+    } catch (error) {
+      console.error('NotificationProvider: Error registering token:', error);
+    }
+  }, []);
+
   useEffect(() => {
     console.log('NotificationProvider: Initializing');
     
+    const registerForPushNotificationsAsync = async (): Promise<string | undefined> => {
+      let token;
+
+      if (Platform.OS === 'android') {
+        await Notifications.setNotificationChannelAsync('default', {
+          name: 'default',
+          importance: Notifications.AndroidImportance.MAX,
+          vibrationPattern: [0, 250, 250, 250],
+          lightColor: '#40A060',
+        });
+      }
+
+      if (Device.isDevice) {
+        const { status: existingStatus } = await Notifications.getPermissionsAsync();
+        let finalStatus = existingStatus;
+        
+        if (existingStatus !== 'granted') {
+          const { status } = await Notifications.requestPermissionsAsync();
+          finalStatus = status;
+        }
+        
+        if (finalStatus !== 'granted') {
+          console.log('NotificationProvider: Permission not granted for push notifications');
+          return;
+        }
+        
+        try {
+          const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+          token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
+          console.log('NotificationProvider: Expo push token:', token);
+        } catch (error) {
+          console.error('NotificationProvider: Error getting push token:', error);
+        }
+      } else {
+        console.log('NotificationProvider: Must use physical device for push notifications');
+      }
+
+      return token;
+    };
+
     // Register for push notifications
     registerForPushNotificationsAsync().then(token => {
       console.log('NotificationProvider: Push token obtained:', token);
@@ -90,7 +191,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         responseListener.current.remove();
       }
     };
-  }, []);
+  }, [user, refreshNotifications, registerTokenWithBackend]);
 
   // Fetch notifications when user logs in
   useEffect(() => {
@@ -106,107 +207,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       console.log('NotificationProvider: User logged out, clearing notifications');
       setNotifications([]);
     }
-  }, [user, refreshNotifications, expoPushToken]);
-
-  const registerForPushNotificationsAsync = async (): Promise<string | undefined> => {
-    let token;
-
-    if (Platform.OS === 'android') {
-      await Notifications.setNotificationChannelAsync('default', {
-        name: 'default',
-        importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#40A060',
-      });
-    }
-
-    if (Device.isDevice) {
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      let finalStatus = existingStatus;
-      
-      if (existingStatus !== 'granted') {
-        const { status } = await Notifications.requestPermissionsAsync();
-        finalStatus = status;
-      }
-      
-      if (finalStatus !== 'granted') {
-        console.log('NotificationProvider: Permission not granted for push notifications');
-        return;
-      }
-      
-      try {
-        const projectId = Constants.expoConfig?.extra?.eas?.projectId;
-        token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-        console.log('NotificationProvider: Expo push token:', token);
-      } catch (error) {
-        console.error('NotificationProvider: Error getting push token:', error);
-      }
-    } else {
-      console.log('NotificationProvider: Must use physical device for push notifications');
-    }
-
-    return token;
-  };
-
-  const registerTokenWithBackend = async (token: string, userId: string) => {
-    try {
-      console.log('NotificationProvider: Registering push token with backend');
-      const backendUrl = Constants.expoConfig?.extra?.backendUrl;
-      
-      const response = await fetch(`${backendUrl}/api/notifications/register-token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          userId,
-          expoPushToken: token,
-          deviceType: Platform.OS,
-        }),
-      });
-
-      if (!response.ok) {
-        console.error('NotificationProvider: Failed to register token with backend');
-      } else {
-        console.log('NotificationProvider: Token registered successfully');
-      }
-    } catch (error) {
-      console.error('NotificationProvider: Error registering token:', error);
-    }
-  };
-
-  const refreshNotifications = useCallback(async () => {
-    if (!user) {
-      console.log('NotificationProvider: No user, skipping notification fetch');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      console.log('NotificationProvider: Fetching notifications for user:', user.id);
-      const backendUrl = Constants.expoConfig?.extra?.backendUrl;
-      
-      const response = await fetch(`${backendUrl}/api/notifications?userId=${user.id}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        console.error('NotificationProvider: Failed to fetch notifications');
-        return;
-      }
-
-      const data = await response.json();
-      console.log('NotificationProvider: Fetched notifications:', data.length);
-      setNotifications(data);
-    } catch (error) {
-      console.error('NotificationProvider: Error fetching notifications:', error);
-    } finally {
-      setLoading(false);
-    }
-  }, [user]);
+  }, [user, expoPushToken, refreshNotifications, registerTokenWithBackend]);
 
   const markAsRead = async (notificationId: string) => {
     try {
