@@ -13,12 +13,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSupabase } from '@/contexts/SupabaseContext';
+import { useNotifications } from '@/contexts/NotificationContext';
 import { colors, typography, spacing, commonStyles } from '@/styles/commonStyles';
+import { IconSymbol } from '@/components/IconSymbol';
 import * as WebBrowser from 'expo-web-browser';
 
 export default function AccountScreen() {
   const { effectiveTheme, themeMode, language, setThemeMode, setLanguage } = useTheme();
   const { profile, signOut, loading: profileLoading } = useSupabase();
+  const { unreadCount } = useNotifications();
   const router = useRouter();
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
 
@@ -144,6 +147,27 @@ export default function AccountScreen() {
           <Text style={[styles.headerTitle, { color: themeColors.foreground }]}>
             {strings.account}
           </Text>
+          <TouchableOpacity
+            style={styles.notificationButton}
+            onPress={() => {
+              console.log('User tapped notifications button');
+              router.push('/notifications');
+            }}
+          >
+            <IconSymbol
+              ios_icon_name="bell.fill"
+              android_material_icon_name="notifications"
+              size={24}
+              color={themeColors.foreground}
+            />
+            {unreadCount > 0 && (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
 
         {/* User Information */}
@@ -328,10 +352,34 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingVertical: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: typography.sizes.h1,
     fontWeight: typography.weights.bold,
+  },
+  notificationButton: {
+    padding: 8,
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#46A758',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+  },
+  notificationBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 10,
+    fontWeight: '600',
   },
   section: {
     marginBottom: 24,

@@ -75,7 +75,7 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
       subscription.unsubscribe();
       clearInterval(pollInterval);
     };
-  }, []);
+  }, [session]);
 
   const fetchProfile = async (userId: string) => {
     try {

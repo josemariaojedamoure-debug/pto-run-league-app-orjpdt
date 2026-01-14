@@ -17,6 +17,7 @@ import { SystemBars } from "react-native-edge-to-edge";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ThemeProvider, useTheme } from "@/contexts/ThemeContext";
 import { SupabaseProvider } from "@/contexts/SupabaseContext";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 
 // Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
@@ -74,6 +75,7 @@ function RootLayoutContent() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="auth" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="notifications" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: "modal" }} />
         <Stack.Screen
           name="transparent-modal"
@@ -101,7 +103,9 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <ThemeProvider>
         <SupabaseProvider>
-          <RootLayoutContent />
+          <NotificationProvider>
+            <RootLayoutContent />
+          </NotificationProvider>
         </SupabaseProvider>
       </ThemeProvider>
     </GestureHandlerRootView>
