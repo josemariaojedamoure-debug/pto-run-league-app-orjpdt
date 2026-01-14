@@ -71,8 +71,9 @@ export default function AccountScreen() {
             console.log('User confirmed logout');
             try {
               await signOut();
-              console.log('User signed out successfully');
-              // Optionally navigate to login screen or show a message
+              console.log('User signed out successfully, redirecting to /auth');
+              // Redirect to auth screen after logout
+              router.replace('/auth');
             } catch (error) {
               console.error('Error signing out:', error);
               Alert.alert(

@@ -25,12 +25,12 @@ export default function DashboardScreen() {
     profileId: user?.id || 'user-profile-id',
   };
 
-  // Build URL with source=app parameter
+  // Build URL with source=app parameter - updates when language changes
   useEffect(() => {
     const url = `${BASE_URL}/participant?source=app`;
-    console.log('Dashboard screen loaded, loading WebView from:', url);
+    console.log('Dashboard screen loaded, loading WebView from:', url, 'Language:', language, 'Theme:', effectiveTheme);
     setWebViewUrl(url);
-  }, []);
+  }, [language, effectiveTheme]);
 
   const handleStravaConnect = async () => {
     console.log('User tapped Connect to Strava button');
@@ -177,7 +177,7 @@ export default function DashboardScreen() {
                 <ActivityIndicator size="large" color={colors.ptoGreen} />
               </View>
             )}
-            onLoadStart={() => console.log('WebView started loading')}
+            onLoadStart={() => console.log('WebView started loading:', webViewUrl)}
             onLoadEnd={() => console.log('WebView finished loading')}
             onError={(syntheticEvent) => {
               const { nativeEvent } = syntheticEvent;
@@ -203,6 +203,7 @@ export default function DashboardScreen() {
             // Inject JavaScript to ensure source=app persists
             injectedJavaScript={`
               (function() {
+                console.log('WebView JavaScript injected - ensuring source=app persists');
                 // Intercept link clicks to add source=app
                 document.addEventListener('click', function(e) {
                   var target = e.target;
@@ -214,6 +215,7 @@ export default function DashboardScreen() {
                     if (!url.searchParams.has('source')) {
                       url.searchParams.set('source', 'app');
                       target.href = url.toString();
+                      console.log('Added source=app to link:', target.href);
                     }
                   }
                 }, true);

@@ -9,17 +9,17 @@ import { colors } from '@/styles/commonStyles';
 const BASE_URL = 'https://publictimeoff.com';
 
 export default function RankingsScreen() {
-  const { effectiveTheme } = useTheme();
+  const { effectiveTheme, language } = useTheme();
   const webViewRef = useRef<WebView>(null);
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
   const [webViewUrl, setWebViewUrl] = useState('');
 
-  // Build URL with source=app parameter
+  // Build URL with source=app parameter - updates when language changes
   useEffect(() => {
     const url = `${BASE_URL}/rankings?source=app`;
-    console.log('Rankings screen loaded, loading WebView from:', url);
+    console.log('Rankings screen loaded, loading WebView from:', url, 'Language:', language, 'Theme:', effectiveTheme);
     setWebViewUrl(url);
-  }, []);
+  }, [language, effectiveTheme]);
 
   if (!webViewUrl) {
     return (
@@ -49,7 +49,7 @@ export default function RankingsScreen() {
             <ActivityIndicator size="large" color={colors.ptoGreen} />
           </View>
         )}
-        onLoadStart={() => console.log('WebView started loading')}
+        onLoadStart={() => console.log('WebView started loading:', webViewUrl)}
         onLoadEnd={() => console.log('WebView finished loading')}
         onError={(syntheticEvent) => {
           const { nativeEvent } = syntheticEvent;
@@ -75,6 +75,7 @@ export default function RankingsScreen() {
         // Inject JavaScript to ensure source=app persists
         injectedJavaScript={`
           (function() {
+            console.log('WebView JavaScript injected - ensuring source=app persists');
             // Intercept link clicks to add source=app
             document.addEventListener('click', function(e) {
               var target = e.target;
@@ -86,6 +87,7 @@ export default function RankingsScreen() {
                 if (!url.searchParams.has('source')) {
                   url.searchParams.set('source', 'app');
                   target.href = url.toString();
+                  console.log('Added source=app to link:', target.href);
                 }
               }
             }, true);
