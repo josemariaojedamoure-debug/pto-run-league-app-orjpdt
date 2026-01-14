@@ -12,20 +12,24 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useSupabase } from '@/contexts/SupabaseContext';
 import { colors, typography, spacing, commonStyles } from '@/styles/commonStyles';
 import * as WebBrowser from 'expo-web-browser';
 
 export default function AccountScreen() {
   const { effectiveTheme, themeMode, language, setThemeMode, setLanguage } = useTheme();
+  const { profile, signOut, loading: profileLoading } = useSupabase();
   const router = useRouter();
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
 
-  // Placeholder user data - TODO: Backend Integration - GET /api/user to fetch user info
-  const [userData] = useState({
-    name: 'Jose Ojeda',
-    company: 'PTO',
-    dateJoined: 'January 2024',
-  });
+  // Use Supabase profile data
+  const userData = {
+    name: profile?.name || 'User',
+    company: profile?.company || 'Company',
+    dateJoined: profile?.created_at 
+      ? new Date(profile.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
+      : 'N/A',
+  };
 
   const handleThemeChange = async (mode: 'light' | 'dark') => {
     console.log('User changed theme to:', mode);
@@ -63,9 +67,19 @@ export default function AccountScreen() {
         {
           text: language === 'en' ? 'Logout' : 'Déconnexion',
           style: 'destructive',
-          onPress: () => {
+          onPress: async () => {
             console.log('User confirmed logout');
-            // TODO: Backend Integration - Clear auth tokens and redirect to login
+            try {
+              await signOut();
+              console.log('User signed out successfully');
+              // Optionally navigate to login screen or show a message
+            } catch (error) {
+              console.error('Error signing out:', error);
+              Alert.alert(
+                'Error',
+                'Failed to sign out. Please try again.'
+              );
+            }
           },
         },
       ]

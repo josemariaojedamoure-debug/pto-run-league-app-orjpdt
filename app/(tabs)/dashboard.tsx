@@ -4,6 +4,7 @@ import { View, StyleSheet, ActivityIndicator, Platform, ScrollView, Text, Toucha
 import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useSupabase } from '@/contexts/SupabaseContext';
 import { colors, typography, spacing } from '@/styles/commonStyles';
 import * as WebBrowser from 'expo-web-browser';
 
@@ -12,16 +13,17 @@ const STRAVA_CLIENT_ID = '183997';
 
 export default function DashboardScreen() {
   const { effectiveTheme, language } = useTheme();
+  const { profile, user, loading: profileLoading } = useSupabase();
   const webViewRef = useRef<WebView>(null);
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
   const [webViewUrl, setWebViewUrl] = useState('');
 
-  // Placeholder user data - TODO: Backend Integration - GET /api/user to fetch user info
-  const [userData] = useState({
-    name: 'Jose Ojeda',
-    company: 'PTO',
-    profileId: 'user-profile-id', // This should come from actual user data
-  });
+  // Use Supabase profile data, fallback to placeholder if not available
+  const userData = {
+    name: profile?.name || 'User',
+    company: profile?.company || 'Company',
+    profileId: user?.id || 'user-profile-id',
+  };
 
   // Build URL with source=app parameter
   useEffect(() => {
@@ -81,7 +83,7 @@ export default function DashboardScreen() {
 
   const strings = t[language];
 
-  if (!webViewUrl) {
+  if (!webViewUrl || profileLoading) {
     return (
       <SafeAreaView
         style={[styles.container, { backgroundColor: themeColors.background }]}
