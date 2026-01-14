@@ -36,7 +36,7 @@ export default function TabLayout() {
         <Stack.Screen name="account" />
       </Stack>
 
-      {/* Custom Bottom Tab Bar - Pill Style */}
+      {/* Custom Bottom Tab Bar - Pill Style with White Bubble Indicator */}
       <SafeAreaView
         edges={['bottom']}
         style={[
@@ -46,7 +46,9 @@ export default function TabLayout() {
       >
         <View style={[
           styles.tabBar,
-          { backgroundColor: themeColors.secondaryBackground || themeColors.mutedBackground },
+          { 
+            backgroundColor: effectiveTheme === 'dark' ? '#3E3C3C' : '#F3F4F6',
+          },
         ]}>
           {tabs.map((tab) => {
             const active = isActive(tab.route);
@@ -55,9 +57,7 @@ export default function TabLayout() {
                 key={tab.name}
                 style={[
                   styles.tabButton,
-                  active && {
-                    backgroundColor: effectiveTheme === 'dark' ? '#FFFFFF' : '#FFFFFF',
-                  },
+                  active && styles.activeTabButton,
                 ]}
                 onPress={() => {
                   console.log('User tapped', tab.name, 'tab');
@@ -69,9 +69,9 @@ export default function TabLayout() {
                     styles.tabLabel,
                     {
                       color: active
-                        ? (effectiveTheme === 'dark' ? '#000000' : '#000000')
-                        : themeColors.mutedText || themeColors.secondaryText,
-                      fontWeight: active ? typography.weights.medium : typography.weights.regular,
+                        ? colors.ptoGreen
+                        : (themeColors.mutedText || themeColors.secondaryText),
+                      fontWeight: active ? '600' : '400',
                     },
                   ]}
                 >
@@ -93,8 +93,8 @@ const styles = StyleSheet.create({
   },
   tabBar: {
     flexDirection: 'row',
-    height: 48,
-    borderRadius: 24,
+    height: 56,
+    borderRadius: 28,
     padding: 4,
     gap: 4,
   },
@@ -102,12 +102,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 20,
+    borderRadius: 24,
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
+  activeTabButton: {
+    backgroundColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   tabLabel: {
-    fontSize: 14,
-    fontFamily: typography.fontFamily,
+    fontSize: 12,
+    fontFamily: 'Helvetica Neue',
   },
 });
