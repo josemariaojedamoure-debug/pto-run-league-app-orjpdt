@@ -1,7 +1,7 @@
 
 {
   "expo": {
-    "name": "PTO Corporate Running League",
+    "name": "PTO",
     "slug": "PTO",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -45,11 +45,18 @@
         "NSCameraUsageDescription": "We need camera access to let you take profile pictures.",
         "NSMotionUsageDescription": "We need motion data to track your running activities.",
         "NSHealthShareUsageDescription": "We need access to your health data to sync your running activities.",
-        "NSHealthUpdateUsageDescription": "We need to update your health data with your running activities."
+        "NSHealthUpdateUsageDescription": "We need to update your health data with your running activities.",
+        "LSApplicationQueriesSchemes": [
+          "instagram",
+          "instagram-stories",
+          "mailto",
+          "message",
+          "strava"
+        ]
       },
       "appStoreMetadata": {
         "subtitle": "",
-        "description": "The corporate running league where everyone can win.\n\nConnect Strava, get your personalized score, and compete fairly with colleagues from beginner to elite. PTO Corporate Running League rewards progress, not just pace.\n\nYour Score, Your Level\nOur scoring system analyzes your Strava data to create a personalized baseline. You compete against your own potential, not against the office marathon runner. Progress and consistency matter more than raw speed.\n\nKey Features:\n• Browse and register for eligible races\n• Track your score evolution and rankings in real-time\n• Connect Strava for automatic activity sync\n• Compete for individual prizes\n• Win company awards with your team\n• Get race reminders and ranking updates via push notifications\n• Share your achievements on social media\n\nStronger Teams Through Movement\nThe league transforms running into shared competition. Team rankings, individual prizes, and company awards create coffee break conversations at the office. Connect across departments because you're competing together, not just running at the same time.\n\nPrizes Worth Racing For\nIndividual and company awards to reward progress, performance, and commitment. Winners are honored at our end-of-season celebration. Bragging rights guaranteed.\n\nJoin the PTO Corporate Running League and make running a team sport at your workplace!\n\nNote: Your company must be a PTO member to participate.",
+        "description": "The corporate running league where everyone can win.\n\nConnect Strava, get your personalized score, and compete fairly with colleagues from beginner to elite. PTO Corporate Running League rewards progress, not just pace.\n\nYour Score, Your Level\nOur scoring system analyzes your Strava data to create a personalized baseline. You compete against your own potential, not against the office marathon runner. Progress and consistency matter more than raw speed.\n\nKey Features:\n\u2022 Browse and register for eligible races\n\u2022 Track your score evolution and rankings in real-time\n\u2022 Connect Strava for automatic activity sync\n\u2022 Compete for individual prizes\n\u2022 Win company awards with your team\n\u2022 Get race reminders and ranking updates via push notifications\n\u2022 Share your achievements on social media\n\nStronger Teams Through Movement\nThe league transforms running into shared competition. Team rankings, individual prizes, and company awards create coffee break conversations at the office. Connect across departments because you're competing together, not just running at the same time.\n\nPrizes Worth Racing For\nIndividual and company awards to reward progress, performance, and commitment. Winners are honored at our end-of-season celebration. Bragging rights guaranteed.\n\nJoin the PTO Corporate Running League and make running a team sport at your workplace!\n\nNote: Your company must be a PTO member to participate.",
         "keywords": [
           "running",
           "corporate",
@@ -80,6 +87,13 @@
             "./assets/images/768b125c-3d62-472d-9afb-8f0843041f87.png",
             "./assets/images/5841af66-762a-4385-b4b9-e2a2bd6b2613.png"
           ]
+        },
+        "appleTeamId": "LUXAA22TTD",
+        "appleId": "josemariaojedamoure@gmail.com",
+        "reviewDetails": {
+          "demoAccountEmail": "test@publictimeoff.com",
+          "demoAccountPassword": "Create a demo account during signup",
+          "notes": "This app is a WebView-based participant app for PTO Corporate Running League.\nIt integrates with our web platform at https://publictimeoff.com.\n\nTest Account:\nEmail: test@publictimeoff.com\nPassword: (password you've created)\n\nKey features to test:\n- Login via WebView\n- View dashboard and rankings\n- Register for events\n- Receive push notifications\n- Strava OAuth integration"
         }
       }
     },
@@ -98,7 +112,15 @@
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE"
-      ]
+      ],
+      "queries": {
+        "schemes": [
+          "instagram",
+          "instagram-stories",
+          "mailto",
+          "strava"
+        ]
+      }
     },
     "web": {
       "favicon": "./assets/images/86248fd5-4ebd-4201-bdd3-b3ac3b8c3fff.png",

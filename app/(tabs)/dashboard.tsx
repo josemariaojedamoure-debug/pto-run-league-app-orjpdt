@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Platform } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Platform, Linking, Alert } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -22,6 +22,131 @@ export default function DashboardScreen() {
     console.log('Dashboard screen loaded, loading WebView from:', url, 'Language:', language, 'Theme:', effectiveTheme);
     setWebViewUrl(url);
   }, [language, effectiveTheme]);
+
+  // Handle navigation state changes to intercept special URLs
+  const handleNavigationStateChange = (navState: any) => {
+    console.log('WebView navigation:', navState.url);
+    
+    const url = navState.url;
+
+    // Intercept Instagram URLs and open in Instagram app
+    if (url.startsWith('instagram://') || url.includes('instagram.com/share')) {
+      console.log('User attempting to share to Instagram, opening Instagram app');
+      
+      // Stop the WebView from navigating
+      if (webViewRef.current) {
+        webViewRef.current.stopLoading();
+      }
+
+      // Try to open Instagram app directly
+      const instagramUrl = url.startsWith('instagram://') ? url : `instagram://share`;
+      
+      Linking.canOpenURL(instagramUrl).then((supported) => {
+        if (supported) {
+          console.log('Opening Instagram app with URL:', instagramUrl);
+          Linking.openURL(instagramUrl);
+        } else {
+          // Fallback: Try to open Instagram in browser or app store
+          console.log('Instagram app not installed, opening fallback');
+          const fallbackUrl = Platform.OS === 'ios' 
+            ? 'https://apps.apple.com/app/instagram/id389801252'
+            : 'https://play.google.com/store/apps/details?id=com.instagram.android';
+          Linking.openURL(fallbackUrl);
+        }
+      }).catch((err) => {
+        console.error('Error opening Instagram:', err);
+        Alert.alert('Error', 'Could not open Instagram. Please make sure Instagram is installed.');
+      });
+
+      return false; // Prevent WebView navigation
+    }
+
+    // Intercept mailto links and open with system mail provider picker
+    if (url.startsWith('mailto:')) {
+      console.log('User attempting to send email, opening mail provider picker');
+      
+      // Stop the WebView from navigating
+      if (webViewRef.current) {
+        webViewRef.current.stopLoading();
+      }
+
+      // Open with system mail provider picker
+      Linking.canOpenURL(url).then((supported) => {
+        if (supported) {
+          console.log('Opening mail provider picker with URL:', url);
+          Linking.openURL(url); // This will show the system picker for Mail/Gmail/etc.
+        } else {
+          console.error('Cannot open mailto URL');
+          Alert.alert('Error', 'Could not open mail app. Please check your mail settings.');
+        }
+      }).catch((err) => {
+        console.error('Error opening mail app:', err);
+        Alert.alert('Error', 'Could not open mail app.');
+      });
+
+      return false; // Prevent WebView navigation
+    }
+
+    // Ensure ?source=app persists across navigation
+    if (url && !url.includes('source=app') && url.includes('publictimeoff.com')) {
+      const separator = url.includes('?') ? '&' : '?';
+      const newUrl = `${url}${separator}source=app`;
+      console.log('Adding source=app to URL:', newUrl);
+    }
+
+    return true; // Allow other navigations
+  };
+
+  // Handle WebView requests to intercept before navigation
+  const handleShouldStartLoadWithRequest = (request: any) => {
+    const url = request.url;
+    console.log('WebView should start load with request:', url);
+
+    // Intercept Instagram URLs
+    if (url.startsWith('instagram://') || url.includes('instagram.com/share')) {
+      console.log('Intercepting Instagram share request');
+      
+      const instagramUrl = url.startsWith('instagram://') ? url : `instagram://share`;
+      
+      Linking.canOpenURL(instagramUrl).then((supported) => {
+        if (supported) {
+          console.log('Opening Instagram app');
+          Linking.openURL(instagramUrl);
+        } else {
+          console.log('Instagram app not installed, opening app store');
+          const fallbackUrl = Platform.OS === 'ios' 
+            ? 'https://apps.apple.com/app/instagram/id389801252'
+            : 'https://play.google.com/store/apps/details?id=com.instagram.android';
+          Linking.openURL(fallbackUrl);
+        }
+      }).catch((err) => {
+        console.error('Error opening Instagram:', err);
+      });
+
+      return false; // Block WebView navigation
+    }
+
+    // Intercept mailto links
+    if (url.startsWith('mailto:')) {
+      console.log('Intercepting mailto request');
+      
+      Linking.canOpenURL(url).then((supported) => {
+        if (supported) {
+          console.log('Opening mail provider picker');
+          Linking.openURL(url);
+        } else {
+          console.error('Cannot open mailto URL');
+        }
+      }).catch((err) => {
+        console.error('Error opening mail app:', err);
+      });
+
+      return false; // Block WebView navigation
+    }
+
+    // Allow all other requests
+    return true;
+  };
 
   if (!webViewUrl || profileLoading) {
     return (
@@ -59,15 +184,8 @@ export default function DashboardScreen() {
             const { nativeEvent } = syntheticEvent;
             console.error('WebView error:', nativeEvent);
           }}
-          onNavigationStateChange={(navState) => {
-            console.log('WebView navigation:', navState.url);
-            // Ensure ?source=app persists across navigation
-            if (navState.url && !navState.url.includes('source=app')) {
-              const separator = navState.url.includes('?') ? '&' : '?';
-              const newUrl = `${navState.url}${separator}source=app`;
-              console.log('Adding source=app to URL:', newUrl);
-            }
-          }}
+          onNavigationStateChange={handleNavigationStateChange}
+          onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
           // Enable JavaScript
           javaScriptEnabled={true}
           // Enable DOM storage
@@ -76,10 +194,11 @@ export default function DashboardScreen() {
           mixedContentMode="compatibility"
           // iOS specific
           allowsBackForwardNavigationGestures={Platform.OS === 'ios'}
-          // Inject JavaScript to ensure source=app persists
+          // Inject JavaScript to ensure source=app persists and handle share buttons
           injectedJavaScript={`
             (function() {
-              console.log('WebView JavaScript injected - ensuring source=app persists');
+              console.log('WebView JavaScript injected - ensuring source=app persists and handling share buttons');
+              
               // Intercept link clicks to add source=app
               document.addEventListener('click', function(e) {
                 var target = e.target;
@@ -87,6 +206,16 @@ export default function DashboardScreen() {
                   target = target.parentElement;
                 }
                 if (target && target.href) {
+                  // Check if it's an Instagram or mailto link
+                  if (target.href.startsWith('instagram://') || 
+                      target.href.includes('instagram.com/share') ||
+                      target.href.startsWith('mailto:')) {
+                    console.log('Detected special link:', target.href);
+                    // Let the native handler deal with it
+                    return;
+                  }
+                  
+                  // Add source=app to internal links
                   var url = new URL(target.href);
                   if (!url.searchParams.has('source')) {
                     url.searchParams.set('source', 'app');
@@ -95,6 +224,14 @@ export default function DashboardScreen() {
                   }
                 }
               }, true);
+
+              // Listen for messages from the web page about Instagram sharing
+              window.addEventListener('message', function(event) {
+                if (event.data && event.data.type === 'instagram-share') {
+                  console.log('Instagram share message received from web');
+                  // The native handler will intercept the navigation
+                }
+              });
             })();
             true;
           `}
