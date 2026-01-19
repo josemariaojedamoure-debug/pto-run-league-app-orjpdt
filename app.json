@@ -153,9 +153,6 @@
     },
     "extra": {
       "router": {},
-      "eas": {
-        "projectId": "your-project-id-here"
-      },
       "backendUrl": "https://fz2p8w6pysxtv25hyuzyxy4ev67xc6kh.app.specular.dev"
     },
     "privacy": "public"
