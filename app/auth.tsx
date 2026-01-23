@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
-import { WebView, WebViewMessageEvent } from 'react-native-webview';
+import { WebView, WebViewMessageEvent, WebViewNavigation } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -13,10 +13,11 @@ const BASE_URL = 'https://publictimeoff.com';
 
 export default function AuthScreen() {
   const { effectiveTheme } = useTheme();
-  const { user, loading } = useSupabase();
+  const { user, loading, checkSession } = useSupabase();
   const router = useRouter();
   const webViewRef = useRef<WebView>(null);
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
+  const hasCheckedSessionRef = useRef(false);
 
   console.log('AuthScreen - User:', user ? 'Logged in' : 'Not logged in', 'Loading:', loading);
 
@@ -28,7 +29,26 @@ export default function AuthScreen() {
     }
   }, [user, loading, router]);
 
-  // Handle messages from the WebView
+  // Handle navigation state changes - detect when user navigates away from /auth
+  const handleNavigationStateChange = async (navState: WebViewNavigation) => {
+    const url = navState.url;
+    console.log('AuthScreen: WebView navigated to:', url);
+
+    // If the user navigates away from /auth (e.g., to /participant or /dashboard),
+    // it means they successfully logged in. Check the session.
+    if (!url.includes('/auth') && !hasCheckedSessionRef.current) {
+      console.log('AuthScreen: User navigated away from /auth, checking session...');
+      hasCheckedSessionRef.current = true;
+      
+      // Wait a moment for cookies to sync
+      setTimeout(async () => {
+        console.log('AuthScreen: Checking session after navigation');
+        await checkSession();
+      }, 500);
+    }
+  };
+
+  // Handle messages from the WebView (backup method)
   const handleWebViewMessage = async (event: WebViewMessageEvent) => {
     try {
       const message = JSON.parse(event.nativeEvent.data);
@@ -154,6 +174,7 @@ export default function AuthScreen() {
             const { nativeEvent } = syntheticEvent;
             console.error('WebView error loading auth page:', nativeEvent);
           }}
+          onNavigationStateChange={handleNavigationStateChange}
           onMessage={handleWebViewMessage}
           injectedJavaScript={injectedJavaScript}
           sharedCookiesEnabled={true}
