@@ -18,8 +18,8 @@ export default function AuthScreen() {
   const webViewRef = useRef<WebView>(null);
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
   const [isCheckingAuth, setIsCheckingAuth] = useState(false);
-  const [webViewKey, setWebViewKey] = useState(0);
   const hasAttemptedAuthRef = useRef(false);
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   console.log('AuthScreen - User:', user ? 'Logged in' : 'Not logged in', 'Loading:', loading, 'Checking:', isCheckingAuth);
 
@@ -30,6 +30,15 @@ export default function AuthScreen() {
       router.replace('/(tabs)/dashboard');
     }
   }, [user, loading, router]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   // Handle navigation state changes
   const handleNavigationStateChange = async (navState: WebViewNavigation) => {
@@ -51,7 +60,6 @@ export default function AuthScreen() {
       setIsCheckingAuth(true);
       
       // Request authentication token from the WebView
-      // The web app should respond with a message containing the auth token
       const requestAuthScript = `
         (function() {
           console.log('AuthScreen: Requesting authentication from web app');
@@ -111,17 +119,14 @@ export default function AuthScreen() {
       
       webViewRef.current?.injectJavaScript(requestAuthScript);
       
-      // Fallback: If we don't receive auth data within 3 seconds,
+      // Fallback: If we don't receive auth data within 2 seconds,
       // assume the user is authenticated via web cookies and proceed
-      setTimeout(() => {
-        if (isCheckingAuth && hasAttemptedAuthRef.current) {
-          console.log('AuthScreen: No auth data received, but user is on authenticated page');
-          console.log('AuthScreen: Proceeding with WebView-based authentication');
-          setIsCheckingAuth(false);
-          // Navigate to dashboard - the WebView will handle auth via cookies
-          router.replace('/(tabs)/dashboard');
-        }
-      }, 3000);
+      timeoutRef.current = setTimeout(() => {
+        console.log('AuthScreen: Timeout reached - proceeding to dashboard');
+        console.log('AuthScreen: User authenticated via web cookies');
+        setIsCheckingAuth(false);
+        router.replace('/(tabs)/dashboard');
+      }, 2000);
     }
   };
 
@@ -134,6 +139,12 @@ export default function AuthScreen() {
       if (message.type === 'AUTH_SUCCESS' && message.session) {
         console.log('AuthScreen: Received Supabase session from WebView');
         
+        // Clear the timeout since we got a response
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+        
         // Set the session in the native Supabase client
         const { data, error } = await supabase.auth.setSession({
           access_token: message.session.access_token,
@@ -144,13 +155,22 @@ export default function AuthScreen() {
           console.error('AuthScreen: Error setting session:', error);
           // Even if session setting fails, user might be authenticated via web cookies
           console.log('AuthScreen: Proceeding to dashboard despite session error');
+          setIsCheckingAuth(false);
           router.replace('/(tabs)/dashboard');
         } else {
           console.log('AuthScreen: Session set successfully, user:', data.user?.email);
+          setIsCheckingAuth(false);
           // The onAuthStateChange listener will handle navigation
         }
       } else if (message.type === 'AUTH_DETECTED') {
         console.log('AuthScreen: Authentication detected, proceeding to dashboard');
+        
+        // Clear the timeout since we got a response
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+          timeoutRef.current = null;
+        }
+        
         setIsCheckingAuth(false);
         router.replace('/(tabs)/dashboard');
       }
@@ -158,6 +178,13 @@ export default function AuthScreen() {
       console.error('AuthScreen: Error handling WebView message:', error);
       // Don't block the user - they might still be authenticated via web cookies
       console.log('AuthScreen: Proceeding to dashboard despite message error');
+      
+      // Clear the timeout
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+        timeoutRef.current = null;
+      }
+      
       setIsCheckingAuth(false);
       router.replace('/(tabs)/dashboard');
     }
@@ -194,48 +221,67 @@ export default function AuthScreen() {
 
   console.log('Loading auth WebView with URL:', authUrl);
 
+  // Show loading screen only when Supabase is loading
+  if (loading) {
+    return (
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: themeColors.background }]}
+        edges={['top', 'bottom']}
+      >
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.ptoGreen} />
+          <Text style={[styles.loadingText, { color: themeColors.text }]}>
+            Loading...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: themeColors.background }]}
       edges={['top', 'bottom']}
     >
-      {loading || isCheckingAuth ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.ptoGreen} />
-          <Text style={[styles.loadingText, { color: themeColors.text }]}>
-            {isCheckingAuth ? 'Completing sign in...' : 'Loading...'}
-          </Text>
+      <WebView
+        ref={webViewRef}
+        source={{ uri: authUrl }}
+        style={styles.webview}
+        startInLoadingState={true}
+        renderLoading={() => (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.ptoGreen} />
+          </View>
+        )}
+        onLoadStart={() => {
+          console.log('WebView started loading auth page');
+        }}
+        onLoadEnd={() => {
+          console.log('WebView finished loading auth page');
+        }}
+        onError={(syntheticEvent) => {
+          const { nativeEvent } = syntheticEvent;
+          console.error('WebView error loading auth page:', nativeEvent);
+        }}
+        onNavigationStateChange={handleNavigationStateChange}
+        onMessage={handleWebViewMessage}
+        injectedJavaScript={injectedJavaScript}
+        sharedCookiesEnabled={true}
+        thirdPartyCookiesEnabled={true}
+        javaScriptEnabled={true}
+        domStorageEnabled={true}
+      />
+      
+      {/* Show overlay when checking auth - WebView stays mounted underneath */}
+      {isCheckingAuth && (
+        <View style={styles.overlay}>
+          <View style={[styles.overlayContent, { backgroundColor: themeColors.background }]}>
+            <ActivityIndicator size="large" color={colors.ptoGreen} />
+            <Text style={[styles.loadingText, { color: themeColors.text }]}>
+              Completing sign in...
+            </Text>
+          </View>
         </View>
-      ) : (
-        <WebView
-          key={webViewKey}
-          ref={webViewRef}
-          source={{ uri: authUrl }}
-          style={styles.webview}
-          startInLoadingState={true}
-          renderLoading={() => (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.ptoGreen} />
-            </View>
-          )}
-          onLoadStart={() => {
-            console.log('WebView started loading auth page');
-          }}
-          onLoadEnd={() => {
-            console.log('WebView finished loading auth page');
-          }}
-          onError={(syntheticEvent) => {
-            const { nativeEvent } = syntheticEvent;
-            console.error('WebView error loading auth page:', nativeEvent);
-          }}
-          onNavigationStateChange={handleNavigationStateChange}
-          onMessage={handleWebViewMessage}
-          injectedJavaScript={injectedJavaScript}
-          sharedCookiesEnabled={true}
-          thirdPartyCookiesEnabled={true}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-        />
       )}
     </SafeAreaView>
   );
@@ -257,5 +303,21 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     fontFamily: typography.regular,
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  overlayContent: {
+    padding: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    minWidth: 200,
   },
 });
