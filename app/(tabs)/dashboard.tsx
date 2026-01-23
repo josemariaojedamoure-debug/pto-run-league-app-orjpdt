@@ -1,18 +1,18 @@
 
 import React, { useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Platform, Linking, Alert } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Platform, Linking, Alert, Text, TouchableOpacity } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSupabase } from '@/contexts/SupabaseContext';
-import { colors } from '@/styles/commonStyles';
+import { colors, typography } from '@/styles/commonStyles';
 import { supabase } from '@/lib/supabase';
 
 const BASE_URL = 'https://publictimeoff.com';
 
 export default function DashboardScreen() {
   const { effectiveTheme, language } = useTheme();
-  const { user, loading: profileLoading, session, checkSession } = useSupabase();
+  const { user, loading: profileLoading, session, checkSession, error, clearError } = useSupabase();
   const webViewRef = useRef<WebView>(null);
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
   const [webViewUrl, setWebViewUrl] = useState('');
@@ -187,6 +187,32 @@ export default function DashboardScreen() {
     return true;
   };
 
+  // Show error state
+  if (error && !profileLoading) {
+    return (
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: themeColors.background }]}
+        edges={['top']}
+      >
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorTitle}>Error</Text>
+          <Text style={styles.errorMessage}>{error}</Text>
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity 
+              style={[styles.button, styles.retryButton]} 
+              onPress={() => {
+                clearError();
+                checkSession();
+              }}
+            >
+              <Text style={styles.buttonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   if (!webViewUrl || profileLoading) {
     return (
       <SafeAreaView
@@ -195,6 +221,7 @@ export default function DashboardScreen() {
       >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.ptoGreen} />
+          <Text style={styles.loadingText}>Loading your profile...</Text>
         </View>
       </SafeAreaView>
     );
@@ -345,5 +372,52 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: colors.text,
+    fontFamily: typography.regular,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  errorTitle: {
+    fontSize: 24,
+    fontFamily: typography.bold,
+    color: colors.destructive,
+    marginBottom: 12,
+  },
+  errorMessage: {
+    fontSize: 16,
+    fontFamily: typography.regular,
+    color: colors.text,
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 24,
+  },
+  buttonContainer: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+    maxWidth: 300,
+  },
+  button: {
+    flex: 1,
+    height: 44,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  retryButton: {
+    backgroundColor: colors.ptoGreen,
+  },
+  buttonText: {
+    fontSize: 16,
+    fontFamily: typography.medium,
+    color: '#FFFFFF',
   },
 });
