@@ -57,7 +57,16 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       console.log('SupabaseProvider: Auth state changed:', _event, session ? 'Session exists' : 'No session');
-      setSession(session);
+      
+      // Only update state if the session actually changed
+      setSession((prevSession) => {
+        if (prevSession?.access_token === session?.access_token) {
+          console.log('SupabaseProvider: Session unchanged, skipping update');
+          return prevSession;
+        }
+        return session;
+      });
+      
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchProfile(session.user.id);
@@ -67,23 +76,11 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    // Poll for session changes (in case web auth completes)
-    const pollInterval = setInterval(async () => {
-      const { data: { session: currentSession } } = await supabase.auth.getSession();
-      if (currentSession && !session) {
-        console.log('SupabaseProvider: Session detected via polling');
-        setSession(currentSession);
-        setUser(currentSession.user);
-        fetchProfile(currentSession.user.id);
-      }
-    }, 2000);
-
     return () => {
       console.log('SupabaseProvider: Cleaning up auth listener');
       subscription.unsubscribe();
-      clearInterval(pollInterval);
     };
-  }, [session]);
+  }, []);
 
   const fetchProfile = async (authUserId: string) => {
     console.log('fetchProfile: Starting fetch for auth user ID:', authUserId);

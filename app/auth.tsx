@@ -17,6 +17,8 @@ export default function AuthScreen() {
   const router = useRouter();
   const webViewRef = useRef<WebView>(null);
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
+  const isProcessingAuth = useRef(false);
+  const lastProcessedToken = useRef<string | null>(null);
 
   console.log('AuthScreen - User:', user ? 'Logged in' : 'Not logged in', 'Loading:', loading);
 
@@ -30,6 +32,12 @@ export default function AuthScreen() {
 
   // Handle messages from WebView
   const handleWebViewMessage = async (event: any) => {
+    // Prevent processing if already handling an auth attempt
+    if (isProcessingAuth.current) {
+      console.log('Already processing auth, ignoring duplicate message');
+      return;
+    }
+
     try {
       const data = JSON.parse(event.nativeEvent.data);
       console.log('Received message from WebView:', data);
@@ -42,6 +50,15 @@ export default function AuthScreen() {
           console.log('Setting session from WebView data');
           const { access_token, refresh_token } = data.session;
           
+          // Check if we already processed this token
+          if (lastProcessedToken.current === access_token) {
+            console.log('Already processed this token, skipping');
+            return;
+          }
+
+          isProcessingAuth.current = true;
+          lastProcessedToken.current = access_token;
+          
           // Set the session in the native Supabase client
           const { data: sessionData, error } = await supabase.auth.setSession({
             access_token,
@@ -50,10 +67,12 @@ export default function AuthScreen() {
 
           if (error) {
             console.error('Error setting session from WebView:', error);
+            isProcessingAuth.current = false;
           } else {
             console.log('Session successfully set from WebView, user should be authenticated now');
             // Force a session check to update the context
             await checkSession();
+            isProcessingAuth.current = false;
           }
         } else {
           // Fallback: Just check for session (in case cookies are shared)
@@ -64,6 +83,15 @@ export default function AuthScreen() {
         console.log('Received auth token from WebView');
         const { access_token, refresh_token } = data;
         
+        // Check if we already processed this token
+        if (lastProcessedToken.current === access_token) {
+          console.log('Already processed this token, skipping');
+          return;
+        }
+
+        isProcessingAuth.current = true;
+        lastProcessedToken.current = access_token;
+        
         // Set the session in the native Supabase client
         const { data: sessionData, error } = await supabase.auth.setSession({
           access_token,
@@ -72,13 +100,21 @@ export default function AuthScreen() {
 
         if (error) {
           console.error('Error setting session from token:', error);
+          // Don't retry - break the loop
+          isProcessingAuth.current = false;
+          
+          // If setSession fails, it means the WebView auth approach isn't working
+          // The user should stay on the auth page and try again
+          console.log('Session sync failed. User should authenticate via WebView.');
         } else {
           console.log('Session successfully set from token');
           await checkSession();
+          isProcessingAuth.current = false;
         }
       }
     } catch (error) {
       console.error('Error handling WebView message:', error);
+      isProcessingAuth.current = false;
     }
   };
 
@@ -138,16 +174,36 @@ export default function AuthScreen() {
             (function() {
               console.log('WebView loaded with theme: ${effectiveTheme}, language: ${language}');
               
+              let lastSentToken = null;
+              let hasSentToken = false;
+              
               // Function to send message to React Native
               function sendMessageToNative(message) {
                 if (window.ReactNativeWebView) {
+                  // Prevent sending duplicate tokens
+                  if (message.type === 'AUTH_TOKEN' && message.access_token === lastSentToken) {
+                    console.log('Token already sent, skipping duplicate');
+                    return;
+                  }
+                  
+                  if (message.type === 'AUTH_TOKEN') {
+                    lastSentToken = message.access_token;
+                    hasSentToken = true;
+                  }
+                  
                   window.ReactNativeWebView.postMessage(JSON.stringify(message));
-                  console.log('Sent message to native app:', message);
+                  console.log('Sent message to native app:', message.type);
                 }
               }
 
               // Check if user is authenticated by looking for Supabase session
               function checkAuthStatus() {
+                // Only check once to prevent loops
+                if (hasSentToken) {
+                  console.log('Already sent token, skipping check');
+                  return;
+                }
+                
                 try {
                   // Try to get session from localStorage (where Supabase stores it)
                   const supabaseAuthKey = Object.keys(localStorage).find(key => 
@@ -160,7 +216,7 @@ export default function AuthScreen() {
                       console.log('Found Supabase auth data in localStorage');
                       const parsed = JSON.parse(authData);
                       
-                      // Send the session to native app
+                      // Send the session to native app (only once)
                       if (parsed.access_token && parsed.refresh_token) {
                         sendMessageToNative({
                           type: 'AUTH_TOKEN',
@@ -181,26 +237,17 @@ export default function AuthScreen() {
               }
 
               // Check auth status on load
-              checkAuthStatus();
+              setTimeout(checkAuthStatus, 1000);
 
               // Monitor for changes to localStorage (successful login)
               const originalSetItem = localStorage.setItem;
               localStorage.setItem = function(key, value) {
                 originalSetItem.apply(this, arguments);
-                if (key.includes('supabase') || key.includes('auth')) {
+                if ((key.includes('supabase') || key.includes('auth')) && !hasSentToken) {
                   console.log('localStorage changed, checking auth status');
                   setTimeout(checkAuthStatus, 500);
                 }
               };
-
-              // Also check periodically in case we miss the event
-              setInterval(checkAuthStatus, 2000);
-
-              // Listen for navigation events that might indicate successful auth
-              window.addEventListener('popstate', function() {
-                console.log('Navigation detected, checking auth status');
-                setTimeout(checkAuthStatus, 500);
-              });
 
               true;
             })();
