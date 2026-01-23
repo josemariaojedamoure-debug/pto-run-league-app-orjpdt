@@ -76,7 +76,7 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
         setUser(currentSession.user);
         fetchProfile(currentSession.user.id);
       }
-    }, 2000); // Check every 2 seconds
+    }, 2000);
 
     return () => {
       console.log('SupabaseProvider: Cleaning up auth listener');
@@ -85,23 +85,21 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
     };
   }, [session]);
 
-  const fetchProfile = async (userId: string) => {
-    console.log('fetchProfile: Starting fetch for user ID:', userId);
+  const fetchProfile = async (authUserId: string) => {
+    console.log('fetchProfile: Starting fetch for auth user ID:', authUserId);
     setError(null);
     
-    // Create a timeout promise
     const timeoutPromise = new Promise((_, reject) => {
       setTimeout(() => reject(new Error('Profile fetch timeout after 10 seconds')), 10000);
     });
 
     try {
-      console.log('fetchProfile: Querying profiles table...');
+      console.log('fetchProfile: Querying profiles table with user_id...');
       
-      // Race between the actual query and the timeout
       const queryPromise = supabase
         .from('profiles')
         .select('*')
-        .eq('id', userId)
+        .eq('user_id', authUserId)
         .maybeSingle();
 
       const { data, error } = await Promise.race([
@@ -114,7 +112,6 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
       if (error) {
         console.error('fetchProfile: Supabase error:', JSON.stringify(error, null, 2));
         
-        // Check for specific error codes
         if (error.code === 'PGRST116') {
           const errorMsg = 'No profile found for your account. Your account may not have access to this app. Please contact your administrator.';
           console.error('fetchProfile: PGRST116 - Profile not found');
@@ -140,16 +137,16 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
           Alert.alert(
             'Error Loading Profile',
             errorMsg,
-            [{ text: 'Retry', onPress: () => fetchProfile(userId) }, { text: 'Cancel' }]
+            [{ text: 'Retry', onPress: () => fetchProfile(authUserId) }, { text: 'Cancel' }]
           );
         }
         setProfile(null);
       } else if (data) {
-        console.log('fetchProfile: Profile found successfully:', data.name, data.company);
+        console.log('fetchProfile: Profile found successfully. Profile ID:', data.id, 'Name:', data.name, 'Company:', data.company);
         setProfile(data);
         setError(null);
       } else {
-        console.log('fetchProfile: No profile data returned (user may not have profile record)');
+        console.log('fetchProfile: No profile data returned for auth user ID:', authUserId);
         const errorMsg = 'Your account does not have a profile. You may not have access to this app. Please contact your administrator.';
         setError(errorMsg);
         Alert.alert(
@@ -176,7 +173,7 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
         'Error',
         errorMsg,
         [
-          { text: 'Retry', onPress: () => fetchProfile(userId) },
+          { text: 'Retry', onPress: () => fetchProfile(authUserId) },
           { text: 'Sign Out', onPress: () => signOut(), style: 'destructive' }
         ]
       );
@@ -250,7 +247,6 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
       }
 
       console.log('signIn: Sign in successful');
-      // Session will be set by onAuthStateChange listener
     } catch (error: any) {
       console.error('signIn: Exception during sign in:', error);
       setError(error.message || 'Sign in failed');
@@ -283,13 +279,12 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
 
       console.log('signUp: Sign up successful');
       
-      // Create profile record if user was created
       if (data.user) {
         const { error: profileError } = await supabase
           .from('profiles')
           .insert([
             {
-              id: data.user.id,
+              user_id: data.user.id,
               name,
               company,
               email,
