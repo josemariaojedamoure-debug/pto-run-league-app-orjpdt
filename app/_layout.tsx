@@ -35,7 +35,7 @@ function RootLayoutContent() {
     }
   }, [loaded]);
 
-  // Show loading screen while fonts are loading
+  // Show native green loading screen while fonts are loading
   if (!loaded) {
     return (
       <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.ptoGreen }}>

@@ -27,7 +27,7 @@ export default function DashboardScreen() {
 
   // Handle navigation state changes to intercept special URLs
   const handleNavigationStateChange = (navState: any) => {
-    console.log('WebView navigation:', navState.url);
+    console.log('Dashboard WebView navigation:', navState.url);
     
     const url = navState.url;
 
@@ -98,7 +98,7 @@ export default function DashboardScreen() {
   // Handle WebView requests to intercept before navigation
   const handleShouldStartLoadWithRequest = (request: any) => {
     const url = request.url;
-    console.log('WebView should start load with request:', url);
+    console.log('Dashboard WebView should start load with request:', url);
 
     // Intercept Instagram URLs
     if (url.startsWith('instagram://') || url.includes('instagram.com/share')) {
@@ -175,12 +175,12 @@ export default function DashboardScreen() {
   if (!webViewUrl) {
     return (
       <SafeAreaView
-        style={[styles.container, { backgroundColor: themeColors.background }]}
+        style={[styles.container, { backgroundColor: colors.ptoGreen }]}
         edges={['top']}
       >
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.ptoGreen} />
-          <Text style={[styles.loadingText, { color: themeColors.text }]}>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+          <Text style={styles.loadingTextWhite}>
             Loading dashboard...
           </Text>
         </View>
@@ -201,24 +201,24 @@ export default function DashboardScreen() {
           style={styles.webview}
           startInLoadingState={true}
           renderLoading={() => (
-            <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={colors.ptoGreen} />
-              <Text style={[styles.loadingText, { color: themeColors.text }]}>
+            <View style={[styles.loadingContainer, { backgroundColor: colors.ptoGreen }]}>
+              <ActivityIndicator size="large" color="#FFFFFF" />
+              <Text style={styles.loadingTextWhite}>
                 Loading dashboard...
               </Text>
             </View>
           )}
           onLoadStart={() => {
-            console.log('WebView started loading:', webViewUrl);
+            console.log('Dashboard WebView started loading:', webViewUrl);
             setIsWebViewLoading(true);
           }}
           onLoadEnd={() => {
-            console.log('WebView finished loading');
+            console.log('Dashboard WebView finished loading');
             setIsWebViewLoading(false);
           }}
           onError={(syntheticEvent) => {
             const { nativeEvent } = syntheticEvent;
-            console.error('WebView error:', nativeEvent);
+            console.error('Dashboard WebView error:', nativeEvent);
             setIsWebViewLoading(false);
           }}
           onNavigationStateChange={handleNavigationStateChange}
@@ -237,11 +237,11 @@ export default function DashboardScreen() {
           thirdPartyCookiesEnabled={true}
         />
         
-        {/* Show loading overlay while WebView is loading */}
+        {/* Show native green loading screen while WebView is loading */}
         {isWebViewLoading && (
-          <View style={styles.loadingOverlay}>
-            <ActivityIndicator size="large" color={colors.ptoGreen} />
-            <Text style={[styles.loadingText, { color: themeColors.text }]}>
+          <View style={[styles.loadingOverlay, { backgroundColor: colors.ptoGreen }]}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+            <Text style={styles.loadingTextWhite}>
               Loading dashboard...
             </Text>
           </View>
@@ -278,12 +278,12 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
   },
-  loadingText: {
+  loadingTextWhite: {
     marginTop: 16,
     fontSize: 16,
     fontFamily: typography.regular,
+    color: '#FFFFFF',
   },
   errorContainer: {
     flex: 1,

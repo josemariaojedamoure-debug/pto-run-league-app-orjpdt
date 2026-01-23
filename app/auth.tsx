@@ -119,13 +119,13 @@ export default function AuthScreen() {
       
       webViewRef.current?.injectJavaScript(requestAuthScript);
       
-      // Reduced timeout to 1 second for faster navigation
+      // Increased timeout to 5 seconds to allow app to process authentication
       timeoutRef.current = setTimeout(() => {
-        console.log('AuthScreen: Timeout reached - proceeding to dashboard');
+        console.log('AuthScreen: Timeout reached after 5 seconds - proceeding to dashboard');
         console.log('AuthScreen: User authenticated via web cookies');
         setIsCheckingAuth(false);
         router.replace('/(tabs)/dashboard');
-      }, 1000);
+      }, 5000);
     }
   };
 
@@ -224,13 +224,30 @@ export default function AuthScreen() {
   if (loading) {
     return (
       <SafeAreaView
-        style={[styles.container, { backgroundColor: themeColors.background }]}
+        style={[styles.container, { backgroundColor: colors.ptoGreen }]}
         edges={['top', 'bottom']}
       >
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.ptoGreen} />
-          <Text style={[styles.loadingText, { color: themeColors.text }]}>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+          <Text style={styles.loadingTextWhite}>
             Loading...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  // Show native green screen while checking auth
+  if (isCheckingAuth) {
+    return (
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: colors.ptoGreen }]}
+        edges={['top', 'bottom']}
+      >
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+          <Text style={styles.loadingTextWhite}>
+            Completing sign in...
           </Text>
         </View>
       </SafeAreaView>
@@ -248,8 +265,11 @@ export default function AuthScreen() {
         style={styles.webview}
         startInLoadingState={true}
         renderLoading={() => (
-          <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={colors.ptoGreen} />
+          <View style={[styles.loadingContainer, { backgroundColor: colors.ptoGreen }]}>
+            <ActivityIndicator size="large" color="#FFFFFF" />
+            <Text style={styles.loadingTextWhite}>
+              Loading...
+            </Text>
           </View>
         )}
         onLoadStart={() => {
@@ -270,18 +290,6 @@ export default function AuthScreen() {
         javaScriptEnabled={true}
         domStorageEnabled={true}
       />
-      
-      {/* Show overlay when checking auth - WebView stays mounted underneath */}
-      {isCheckingAuth && (
-        <View style={styles.overlay}>
-          <View style={[styles.overlayContent, { backgroundColor: themeColors.background }]}>
-            <ActivityIndicator size="large" color={colors.ptoGreen} />
-            <Text style={[styles.loadingText, { color: themeColors.text }]}>
-              Completing sign in...
-            </Text>
-          </View>
-        </View>
-      )}
     </SafeAreaView>
   );
 }
@@ -298,25 +306,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingText: {
+  loadingTextWhite: {
     marginTop: 16,
     fontSize: 16,
     fontFamily: typography.regular,
-  },
-  overlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  overlayContent: {
-    padding: 32,
-    borderRadius: 16,
-    alignItems: 'center',
-    minWidth: 200,
+    color: '#FFFFFF',
   },
 });
