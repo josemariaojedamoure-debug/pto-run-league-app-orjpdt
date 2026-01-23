@@ -1,12 +1,13 @@
 
 import React, { useRef, useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { WebView, WebViewMessageEvent } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSupabase } from '@/contexts/SupabaseContext';
 import { colors } from '@/styles/commonStyles';
+import { supabase } from '@/lib/supabase';
 
 const BASE_URL = 'https://publictimeoff.com';
 
@@ -20,13 +21,103 @@ export default function AuthScreen() {
   console.log('AuthScreen - User:', user ? 'Logged in' : 'Not logged in', 'Loading:', loading);
 
   // Redirect to dashboard if user is authenticated
-  // The onAuthStateChange listener in SupabaseContext will detect when auth succeeds
   useEffect(() => {
     if (!loading && user) {
-      console.log('User authenticated via onAuthStateChange listener, redirecting to dashboard');
+      console.log('User authenticated, redirecting to dashboard');
       router.replace('/(tabs)/dashboard');
     }
   }, [user, loading, router]);
+
+  // Handle messages from the WebView
+  const handleWebViewMessage = async (event: WebViewMessageEvent) => {
+    try {
+      const message = JSON.parse(event.nativeEvent.data);
+      console.log('AuthScreen: Received message from WebView:', message.type);
+
+      if (message.type === 'SUPABASE_AUTH_SUCCESS' && message.session) {
+        console.log('AuthScreen: Setting session from WebView message');
+        
+        // Set the session in the native Supabase client
+        const { data, error } = await supabase.auth.setSession({
+          access_token: message.session.access_token,
+          refresh_token: message.session.refresh_token,
+        });
+
+        if (error) {
+          console.error('AuthScreen: Error setting session:', error);
+        } else {
+          console.log('AuthScreen: Session set successfully, user:', data.user?.email);
+          // The onAuthStateChange listener in SupabaseContext will handle the rest
+        }
+      }
+    } catch (error) {
+      console.error('AuthScreen: Error handling WebView message:', error);
+    }
+  };
+
+  // Inject JavaScript to listen for Supabase auth events and send them to React Native
+  const injectedJavaScript = `
+    (function() {
+      console.log('AuthScreen injected script: Setting up Supabase auth listener');
+      
+      // Function to send message to React Native
+      function sendMessageToApp(type, data) {
+        if (window.ReactNativeWebView) {
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type, ...data }));
+          console.log('AuthScreen injected script: Sent message to app:', type);
+        }
+      }
+
+      // Check if Supabase is available
+      if (typeof window.supabase !== 'undefined') {
+        console.log('AuthScreen injected script: Supabase client found');
+        
+        // Listen for auth state changes
+        window.supabase.auth.onAuthStateChange((event, session) => {
+          console.log('AuthScreen injected script: Auth state changed:', event);
+          
+          if (event === 'SIGNED_IN' && session) {
+            console.log('AuthScreen injected script: User signed in, sending session to app');
+            sendMessageToApp('SUPABASE_AUTH_SUCCESS', { session });
+          }
+        });
+
+        // Also check for existing session immediately
+        window.supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session) {
+            console.log('AuthScreen injected script: Existing session found, sending to app');
+            sendMessageToApp('SUPABASE_AUTH_SUCCESS', { session });
+          }
+        });
+      } else {
+        console.log('AuthScreen injected script: Supabase client not found, will retry');
+        
+        // Retry after a delay if Supabase isn't loaded yet
+        setTimeout(() => {
+          if (typeof window.supabase !== 'undefined') {
+            console.log('AuthScreen injected script: Supabase client found on retry');
+            
+            window.supabase.auth.onAuthStateChange((event, session) => {
+              console.log('AuthScreen injected script: Auth state changed:', event);
+              
+              if (event === 'SIGNED_IN' && session) {
+                console.log('AuthScreen injected script: User signed in, sending session to app');
+                sendMessageToApp('SUPABASE_AUTH_SUCCESS', { session });
+              }
+            });
+
+            window.supabase.auth.getSession().then(({ data: { session } }) => {
+              if (session) {
+                console.log('AuthScreen injected script: Existing session found, sending to app');
+                sendMessageToApp('SUPABASE_AUTH_SUCCESS', { session });
+              }
+            });
+          }
+        }, 1000);
+      }
+    })();
+    true; // Required for iOS
+  `;
 
   // Build the auth URL
   const authUrl = `${BASE_URL}/auth?source=app`;
@@ -63,14 +154,12 @@ export default function AuthScreen() {
             const { nativeEvent } = syntheticEvent;
             console.error('WebView error loading auth page:', nativeEvent);
           }}
-          // Allow cookies and local storage for authentication
-          // This enables the native Supabase client to share the session with the WebView
+          onMessage={handleWebViewMessage}
+          injectedJavaScript={injectedJavaScript}
           sharedCookiesEnabled={true}
           thirdPartyCookiesEnabled={true}
           javaScriptEnabled={true}
           domStorageEnabled={true}
-          // Allow the WebView to navigate freely during authentication
-          // The onAuthStateChange listener will detect when auth succeeds
         />
       )}
     </SafeAreaView>
