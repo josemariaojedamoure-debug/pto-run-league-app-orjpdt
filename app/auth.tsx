@@ -119,14 +119,13 @@ export default function AuthScreen() {
       
       webViewRef.current?.injectJavaScript(requestAuthScript);
       
-      // Fallback: If we don't receive auth data within 2 seconds,
-      // assume the user is authenticated via web cookies and proceed
+      // Reduced timeout to 1 second for faster navigation
       timeoutRef.current = setTimeout(() => {
         console.log('AuthScreen: Timeout reached - proceeding to dashboard');
         console.log('AuthScreen: User authenticated via web cookies');
         setIsCheckingAuth(false);
         router.replace('/(tabs)/dashboard');
-      }, 2000);
+      }, 1000);
     }
   };
 

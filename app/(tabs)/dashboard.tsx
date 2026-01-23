@@ -15,10 +15,12 @@ export default function DashboardScreen() {
   const webViewRef = useRef<WebView>(null);
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
   const [webViewUrl, setWebViewUrl] = useState('');
+  const [isWebViewLoading, setIsWebViewLoading] = useState(true);
 
   // Build URL with source=app parameter - updates when language changes
   useEffect(() => {
-    const url = `${BASE_URL}/participant?source=app`;
+    // Load the participant page directly - the web app will handle authentication
+    const url = `${BASE_URL}/${language}/participant?source=app`;
     console.log('Dashboard screen loaded, loading WebView from:', url, 'Language:', language, 'Theme:', effectiveTheme);
     setWebViewUrl(url);
   }, [language, effectiveTheme]);
@@ -28,6 +30,9 @@ export default function DashboardScreen() {
     console.log('WebView navigation:', navState.url);
     
     const url = navState.url;
+
+    // Update loading state
+    setIsWebViewLoading(navState.loading);
 
     // Intercept Instagram URLs and open in Instagram app
     if (url.startsWith('instagram://') || url.includes('instagram.com/share')) {
@@ -167,7 +172,7 @@ export default function DashboardScreen() {
     );
   }
 
-  if (!webViewUrl || profileLoading) {
+  if (!webViewUrl) {
     return (
       <SafeAreaView
         style={[styles.container, { backgroundColor: themeColors.background }]}
@@ -175,7 +180,9 @@ export default function DashboardScreen() {
       >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.ptoGreen} />
-          <Text style={styles.loadingText}>Loading your profile...</Text>
+          <Text style={[styles.loadingText, { color: themeColors.text }]}>
+            Loading dashboard...
+          </Text>
         </View>
       </SafeAreaView>
     );
@@ -196,13 +203,23 @@ export default function DashboardScreen() {
           renderLoading={() => (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color={colors.ptoGreen} />
+              <Text style={[styles.loadingText, { color: themeColors.text }]}>
+                Loading dashboard...
+              </Text>
             </View>
           )}
-          onLoadStart={() => console.log('WebView started loading:', webViewUrl)}
-          onLoadEnd={() => console.log('WebView finished loading')}
+          onLoadStart={() => {
+            console.log('WebView started loading:', webViewUrl);
+            setIsWebViewLoading(true);
+          }}
+          onLoadEnd={() => {
+            console.log('WebView finished loading');
+            setIsWebViewLoading(false);
+          }}
           onError={(syntheticEvent) => {
             const { nativeEvent } = syntheticEvent;
             console.error('WebView error:', nativeEvent);
+            setIsWebViewLoading(false);
           }}
           onNavigationStateChange={handleNavigationStateChange}
           onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
@@ -219,6 +236,16 @@ export default function DashboardScreen() {
           sharedCookiesEnabled={true}
           thirdPartyCookiesEnabled={true}
         />
+        
+        {/* Show loading overlay while WebView is loading */}
+        {isWebViewLoading && (
+          <View style={styles.loadingOverlay}>
+            <ActivityIndicator size="large" color={colors.ptoGreen} />
+            <Text style={[styles.loadingText, { color: themeColors.text }]}>
+              Loading dashboard...
+            </Text>
+          </View>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -243,10 +270,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+  },
   loadingText: {
     marginTop: 16,
     fontSize: 16,
-    color: colors.text,
     fontFamily: typography.regular,
   },
   errorContainer: {
@@ -264,7 +300,6 @@ const styles = StyleSheet.create({
   errorMessage: {
     fontSize: 16,
     fontFamily: typography.regular,
-    color: colors.text,
     textAlign: 'center',
     marginBottom: 24,
     lineHeight: 24,
