@@ -7,12 +7,13 @@ import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSupabase } from '@/contexts/SupabaseContext';
 import { colors } from '@/styles/commonStyles';
+import { supabase } from '@/lib/supabase';
 
 const BASE_URL = 'https://publictimeoff.com';
 
 export default function AuthScreen() {
   const { effectiveTheme, language } = useTheme();
-  const { user, loading } = useSupabase();
+  const { user, loading, checkSession } = useSupabase();
   const router = useRouter();
   const webViewRef = useRef<WebView>(null);
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
@@ -26,6 +27,60 @@ export default function AuthScreen() {
       router.replace('/(tabs)/dashboard');
     }
   }, [user, loading, router]);
+
+  // Handle messages from WebView
+  const handleWebViewMessage = async (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      console.log('Received message from WebView:', data);
+
+      if (data.type === 'AUTH_SUCCESS') {
+        console.log('Authentication successful in WebView, syncing session to native app');
+        
+        // If the web page sends us the session data, set it in the native Supabase client
+        if (data.session) {
+          console.log('Setting session from WebView data');
+          const { access_token, refresh_token } = data.session;
+          
+          // Set the session in the native Supabase client
+          const { data: sessionData, error } = await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          });
+
+          if (error) {
+            console.error('Error setting session from WebView:', error);
+          } else {
+            console.log('Session successfully set from WebView, user should be authenticated now');
+            // Force a session check to update the context
+            await checkSession();
+          }
+        } else {
+          // Fallback: Just check for session (in case cookies are shared)
+          console.log('No session data in message, checking for session via Supabase');
+          await checkSession();
+        }
+      } else if (data.type === 'AUTH_TOKEN') {
+        console.log('Received auth token from WebView');
+        const { access_token, refresh_token } = data;
+        
+        // Set the session in the native Supabase client
+        const { data: sessionData, error } = await supabase.auth.setSession({
+          access_token,
+          refresh_token,
+        });
+
+        if (error) {
+          console.error('Error setting session from token:', error);
+        } else {
+          console.log('Session successfully set from token');
+          await checkSession();
+        }
+      }
+    } catch (error) {
+      console.error('Error handling WebView message:', error);
+    }
+  };
 
   // Build the auth URL with source parameter
   const authUrl = `${BASE_URL}/auth?source=app`;
@@ -62,23 +117,91 @@ export default function AuthScreen() {
             const { nativeEvent } = syntheticEvent;
             console.error('WebView error loading auth page:', nativeEvent);
           }}
+          onMessage={handleWebViewMessage}
           onNavigationStateChange={(navState) => {
             console.log('WebView navigation state changed:', navState.url);
             
             // Check if user has navigated away from auth page (successful login)
             if (navState.url && !navState.url.includes('/auth')) {
               console.log('User navigated away from auth page, checking authentication status');
-              // The SupabaseContext will detect the session change and redirect
+              // Check for session after a short delay to allow cookies to sync
+              setTimeout(() => {
+                checkSession();
+              }, 1000);
             }
           }}
           // Allow cookies and local storage for authentication
           sharedCookiesEnabled={true}
           thirdPartyCookiesEnabled={true}
-          // Inject JavaScript to sync theme and language if needed
+          // Inject JavaScript to detect successful authentication and send session to native app
           injectedJavaScript={`
             (function() {
               console.log('WebView loaded with theme: ${effectiveTheme}, language: ${language}');
-              // You can add code here to communicate theme/language to the web app if needed
+              
+              // Function to send message to React Native
+              function sendMessageToNative(message) {
+                if (window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify(message));
+                  console.log('Sent message to native app:', message);
+                }
+              }
+
+              // Check if user is authenticated by looking for Supabase session
+              function checkAuthStatus() {
+                try {
+                  // Try to get session from localStorage (where Supabase stores it)
+                  const supabaseAuthKey = Object.keys(localStorage).find(key => 
+                    key.includes('supabase.auth.token') || key.includes('sb-') && key.includes('-auth-token')
+                  );
+                  
+                  if (supabaseAuthKey) {
+                    const authData = localStorage.getItem(supabaseAuthKey);
+                    if (authData) {
+                      console.log('Found Supabase auth data in localStorage');
+                      const parsed = JSON.parse(authData);
+                      
+                      // Send the session to native app
+                      if (parsed.access_token && parsed.refresh_token) {
+                        sendMessageToNative({
+                          type: 'AUTH_TOKEN',
+                          access_token: parsed.access_token,
+                          refresh_token: parsed.refresh_token
+                        });
+                      } else if (parsed.currentSession) {
+                        sendMessageToNative({
+                          type: 'AUTH_SUCCESS',
+                          session: parsed.currentSession
+                        });
+                      }
+                    }
+                  }
+                } catch (error) {
+                  console.error('Error checking auth status:', error);
+                }
+              }
+
+              // Check auth status on load
+              checkAuthStatus();
+
+              // Monitor for changes to localStorage (successful login)
+              const originalSetItem = localStorage.setItem;
+              localStorage.setItem = function(key, value) {
+                originalSetItem.apply(this, arguments);
+                if (key.includes('supabase') || key.includes('auth')) {
+                  console.log('localStorage changed, checking auth status');
+                  setTimeout(checkAuthStatus, 500);
+                }
+              };
+
+              // Also check periodically in case we miss the event
+              setInterval(checkAuthStatus, 2000);
+
+              // Listen for navigation events that might indicate successful auth
+              window.addEventListener('popstate', function() {
+                console.log('Navigation detected, checking auth status');
+                setTimeout(checkAuthStatus, 500);
+              });
+
               true;
             })();
           `}

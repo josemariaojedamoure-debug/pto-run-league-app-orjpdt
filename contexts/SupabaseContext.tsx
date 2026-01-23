@@ -88,6 +88,7 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         console.error('Error fetching profile:', error);
+        // Profile might not exist yet, that's okay
         setProfile(null);
       } else {
         console.log('Profile fetched successfully:', data);
@@ -110,12 +111,32 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
 
   const checkSession = async () => {
     console.log('Manually checking session');
-    const { data: { session: currentSession } } = await supabase.auth.getSession();
-    if (currentSession) {
-      console.log('Session found during manual check');
-      setSession(currentSession);
-      setUser(currentSession.user);
-      await fetchProfile(currentSession.user.id);
+    setLoading(true);
+    try {
+      const { data: { session: currentSession }, error } = await supabase.auth.getSession();
+      if (error) {
+        console.error('Error checking session:', error);
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+      } else if (currentSession) {
+        console.log('Session found during manual check');
+        setSession(currentSession);
+        setUser(currentSession.user);
+        await fetchProfile(currentSession.user.id);
+      } else {
+        console.log('No session found during manual check');
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+      }
+    } catch (error) {
+      console.error('Exception checking session:', error);
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+    } finally {
+      setLoading(false);
     }
   };
 

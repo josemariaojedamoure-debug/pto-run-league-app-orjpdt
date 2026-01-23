@@ -6,12 +6,13 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSupabase } from '@/contexts/SupabaseContext';
 import { colors } from '@/styles/commonStyles';
+import { supabase } from '@/lib/supabase';
 
 const BASE_URL = 'https://publictimeoff.com';
 
 export default function DashboardScreen() {
   const { effectiveTheme, language } = useTheme();
-  const { user, loading: profileLoading } = useSupabase();
+  const { user, loading: profileLoading, session, checkSession } = useSupabase();
   const webViewRef = useRef<WebView>(null);
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
   const [webViewUrl, setWebViewUrl] = useState('');
@@ -22,6 +23,44 @@ export default function DashboardScreen() {
     console.log('Dashboard screen loaded, loading WebView from:', url, 'Language:', language, 'Theme:', effectiveTheme);
     setWebViewUrl(url);
   }, [language, effectiveTheme]);
+
+  // Handle messages from WebView to sync session
+  const handleWebViewMessage = async (event: any) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      console.log('Dashboard received message from WebView:', data);
+
+      if (data.type === 'AUTH_TOKEN' || data.type === 'AUTH_SUCCESS') {
+        console.log('Syncing session from WebView to native app');
+        
+        let access_token, refresh_token;
+        
+        if (data.type === 'AUTH_TOKEN') {
+          access_token = data.access_token;
+          refresh_token = data.refresh_token;
+        } else if (data.session) {
+          access_token = data.session.access_token;
+          refresh_token = data.session.refresh_token;
+        }
+
+        if (access_token && refresh_token) {
+          const { error } = await supabase.auth.setSession({
+            access_token,
+            refresh_token,
+          });
+
+          if (error) {
+            console.error('Error setting session from WebView:', error);
+          } else {
+            console.log('Session successfully synced from WebView');
+            await checkSession();
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error handling WebView message:', error);
+    }
+  };
 
   // Handle navigation state changes to intercept special URLs
   const handleNavigationStateChange = (navState: any) => {
@@ -184,6 +223,7 @@ export default function DashboardScreen() {
             const { nativeEvent } = syntheticEvent;
             console.error('WebView error:', nativeEvent);
           }}
+          onMessage={handleWebViewMessage}
           onNavigationStateChange={handleNavigationStateChange}
           onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
           // Enable JavaScript
@@ -194,10 +234,56 @@ export default function DashboardScreen() {
           mixedContentMode="compatibility"
           // iOS specific
           allowsBackForwardNavigationGestures={Platform.OS === 'ios'}
-          // Inject JavaScript to ensure source=app persists and handle share buttons
+          // Share cookies with auth WebView
+          sharedCookiesEnabled={true}
+          thirdPartyCookiesEnabled={true}
+          // Inject JavaScript to sync session and handle share buttons
           injectedJavaScript={`
             (function() {
-              console.log('WebView JavaScript injected - ensuring source=app persists and handling share buttons');
+              console.log('Dashboard WebView JavaScript injected');
+              
+              // Function to send message to React Native
+              function sendMessageToNative(message) {
+                if (window.ReactNativeWebView) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify(message));
+                  console.log('Sent message to native app:', message);
+                }
+              }
+
+              // Check if user is authenticated and sync session to native app
+              function syncSessionToNative() {
+                try {
+                  const supabaseAuthKey = Object.keys(localStorage).find(key => 
+                    key.includes('supabase.auth.token') || key.includes('sb-') && key.includes('-auth-token')
+                  );
+                  
+                  if (supabaseAuthKey) {
+                    const authData = localStorage.getItem(supabaseAuthKey);
+                    if (authData) {
+                      console.log('Found Supabase auth data, syncing to native');
+                      const parsed = JSON.parse(authData);
+                      
+                      if (parsed.access_token && parsed.refresh_token) {
+                        sendMessageToNative({
+                          type: 'AUTH_TOKEN',
+                          access_token: parsed.access_token,
+                          refresh_token: parsed.refresh_token
+                        });
+                      } else if (parsed.currentSession) {
+                        sendMessageToNative({
+                          type: 'AUTH_SUCCESS',
+                          session: parsed.currentSession
+                        });
+                      }
+                    }
+                  }
+                } catch (error) {
+                  console.error('Error syncing session:', error);
+                }
+              }
+
+              // Sync session on load
+              syncSessionToNative();
               
               // Intercept link clicks to add source=app
               document.addEventListener('click', function(e) {
