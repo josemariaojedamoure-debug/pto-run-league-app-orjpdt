@@ -6,13 +6,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSupabase } from '@/contexts/SupabaseContext';
 import { colors, typography } from '@/styles/commonStyles';
-import { supabase } from '@/lib/supabase';
 
 const BASE_URL = 'https://publictimeoff.com';
 
 export default function DashboardScreen() {
   const { effectiveTheme, language } = useTheme();
-  const { user, loading: profileLoading, session, checkSession, error, clearError } = useSupabase();
+  const { user, loading: profileLoading, error, clearError, checkSession } = useSupabase();
   const webViewRef = useRef<WebView>(null);
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
   const [webViewUrl, setWebViewUrl] = useState('');
@@ -23,44 +22,6 @@ export default function DashboardScreen() {
     console.log('Dashboard screen loaded, loading WebView from:', url, 'Language:', language, 'Theme:', effectiveTheme);
     setWebViewUrl(url);
   }, [language, effectiveTheme]);
-
-  // Handle messages from WebView to sync session
-  const handleWebViewMessage = async (event: any) => {
-    try {
-      const data = JSON.parse(event.nativeEvent.data);
-      console.log('Dashboard received message from WebView:', data);
-
-      if (data.type === 'AUTH_TOKEN' || data.type === 'AUTH_SUCCESS') {
-        console.log('Syncing session from WebView to native app');
-        
-        let access_token, refresh_token;
-        
-        if (data.type === 'AUTH_TOKEN') {
-          access_token = data.access_token;
-          refresh_token = data.refresh_token;
-        } else if (data.session) {
-          access_token = data.session.access_token;
-          refresh_token = data.session.refresh_token;
-        }
-
-        if (access_token && refresh_token) {
-          const { error } = await supabase.auth.setSession({
-            access_token,
-            refresh_token,
-          });
-
-          if (error) {
-            console.error('Error setting session from WebView:', error);
-          } else {
-            console.log('Session successfully synced from WebView');
-            await checkSession();
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error handling WebView message:', error);
-    }
-  };
 
   // Handle navigation state changes to intercept special URLs
   const handleNavigationStateChange = (navState: any) => {
@@ -124,13 +85,6 @@ export default function DashboardScreen() {
       });
 
       return false; // Prevent WebView navigation
-    }
-
-    // Ensure ?source=app persists across navigation
-    if (url && !url.includes('source=app') && url.includes('publictimeoff.com')) {
-      const separator = url.includes('?') ? '&' : '?';
-      const newUrl = `${url}${separator}source=app`;
-      console.log('Adding source=app to URL:', newUrl);
     }
 
     return true; // Allow other navigations
@@ -250,7 +204,6 @@ export default function DashboardScreen() {
             const { nativeEvent } = syntheticEvent;
             console.error('WebView error:', nativeEvent);
           }}
-          onMessage={handleWebViewMessage}
           onNavigationStateChange={handleNavigationStateChange}
           onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
           // Enable JavaScript
@@ -261,93 +214,10 @@ export default function DashboardScreen() {
           mixedContentMode="compatibility"
           // iOS specific
           allowsBackForwardNavigationGestures={Platform.OS === 'ios'}
-          // Share cookies with auth WebView
+          // Share cookies with auth WebView - this allows the native Supabase client
+          // to detect the session via the onAuthStateChange listener
           sharedCookiesEnabled={true}
           thirdPartyCookiesEnabled={true}
-          // Inject JavaScript to sync session and handle share buttons
-          injectedJavaScript={`
-            (function() {
-              console.log('Dashboard WebView JavaScript injected');
-              
-              // Function to send message to React Native
-              function sendMessageToNative(message) {
-                if (window.ReactNativeWebView) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify(message));
-                  console.log('Sent message to native app:', message);
-                }
-              }
-
-              // Check if user is authenticated and sync session to native app
-              function syncSessionToNative() {
-                try {
-                  const supabaseAuthKey = Object.keys(localStorage).find(key => 
-                    key.includes('supabase.auth.token') || key.includes('sb-') && key.includes('-auth-token')
-                  );
-                  
-                  if (supabaseAuthKey) {
-                    const authData = localStorage.getItem(supabaseAuthKey);
-                    if (authData) {
-                      console.log('Found Supabase auth data, syncing to native');
-                      const parsed = JSON.parse(authData);
-                      
-                      if (parsed.access_token && parsed.refresh_token) {
-                        sendMessageToNative({
-                          type: 'AUTH_TOKEN',
-                          access_token: parsed.access_token,
-                          refresh_token: parsed.refresh_token
-                        });
-                      } else if (parsed.currentSession) {
-                        sendMessageToNative({
-                          type: 'AUTH_SUCCESS',
-                          session: parsed.currentSession
-                        });
-                      }
-                    }
-                  }
-                } catch (error) {
-                  console.error('Error syncing session:', error);
-                }
-              }
-
-              // Sync session on load
-              syncSessionToNative();
-              
-              // Intercept link clicks to add source=app
-              document.addEventListener('click', function(e) {
-                var target = e.target;
-                while (target && target.tagName !== 'A') {
-                  target = target.parentElement;
-                }
-                if (target && target.href) {
-                  // Check if it's an Instagram or mailto link
-                  if (target.href.startsWith('instagram://') || 
-                      target.href.includes('instagram.com/share') ||
-                      target.href.startsWith('mailto:')) {
-                    console.log('Detected special link:', target.href);
-                    // Let the native handler deal with it
-                    return;
-                  }
-                  
-                  // Add source=app to internal links
-                  var url = new URL(target.href);
-                  if (!url.searchParams.has('source')) {
-                    url.searchParams.set('source', 'app');
-                    target.href = url.toString();
-                    console.log('Added source=app to link:', target.href);
-                  }
-                }
-              }, true);
-
-              // Listen for messages from the web page about Instagram sharing
-              window.addEventListener('message', function(event) {
-                if (event.data && event.data.type === 'instagram-share') {
-                  console.log('Instagram share message received from web');
-                  // The native handler will intercept the navigation
-                }
-              });
-            })();
-            true;
-          `}
         />
       </View>
     </SafeAreaView>

@@ -54,23 +54,18 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    // Listen for auth changes
+    // Listen for auth changes - this will detect when user authenticates in WebView
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log('SupabaseProvider: Auth state changed:', _event, session ? 'Session exists' : 'No session');
+      console.log('SupabaseProvider: Auth state changed - Event:', _event, 'Session:', session ? 'exists' : 'none');
       
-      // Only update state if the session actually changed
-      setSession((prevSession) => {
-        if (prevSession?.access_token === session?.access_token) {
-          console.log('SupabaseProvider: Session unchanged, skipping update');
-          return prevSession;
-        }
-        return session;
-      });
-      
+      setSession(session);
       setUser(session?.user ?? null);
+      
       if (session?.user) {
+        console.log('SupabaseProvider: User authenticated, fetching profile');
         fetchProfile(session.user.id);
       } else {
+        console.log('SupabaseProvider: User signed out, clearing profile');
         setProfile(null);
         setLoading(false);
       }
