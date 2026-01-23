@@ -11,127 +11,85 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
+import { IconSymbol } from '@/components/IconSymbol';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSupabase } from '@/contexts/SupabaseContext';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { colors, typography, spacing, commonStyles } from '@/styles/commonStyles';
-import { IconSymbol } from '@/components/IconSymbol';
-import * as WebBrowser from 'expo-web-browser';
 
 export default function AccountScreen() {
-  const { effectiveTheme, themeMode, language, setThemeMode, setLanguage } = useTheme();
-  const { profile, signOut, loading: profileLoading } = useSupabase();
-  const { unreadCount } = useNotifications();
   const router = useRouter();
+  const { effectiveTheme, setThemeMode, themeMode, language, setLanguage } = useTheme();
+  const { user, profile, signOut, loading } = useSupabase();
+  const { notifications, unreadCount } = useNotifications();
+  const [signingOut, setSigningOut] = useState(false);
+
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
 
-  // Use Supabase profile data
-  const userData = {
-    name: profile?.name || 'User',
-    company: profile?.company || 'Company',
-    dateJoined: profile?.created_at 
-      ? new Date(profile.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long' })
-      : 'N/A',
-  };
-
-  const handleThemeChange = async (mode: 'light' | 'dark') => {
+  const handleThemeChange = (mode: 'light' | 'dark') => {
     console.log('User changed theme to:', mode);
-    await setThemeMode(mode);
+    setThemeMode(mode);
   };
 
-  const handleLanguageChange = async (lang: 'en' | 'fr') => {
+  const handleLanguageChange = (lang: 'en' | 'fr') => {
     console.log('User changed language to:', lang);
-    await setLanguage(lang);
+    setLanguage(lang);
   };
 
   const handleLinkPress = async (url: string, title: string) => {
     console.log('User tapped link:', title, url);
     try {
-      // Add ?source=app to all links
-      const fullUrl = `https://publictimeoff.com${url}?source=app`;
-      await WebBrowser.openBrowserAsync(fullUrl);
+      await WebBrowser.openBrowserAsync(url);
     } catch (error) {
       console.error('Error opening browser:', error);
+      Alert.alert('Error', 'Could not open link');
     }
   };
 
   const handleLogout = () => {
-    console.log('User tapped Logout button');
+    console.log('User tapped logout button');
     Alert.alert(
-      language === 'en' ? 'Logout' : 'Déconnexion',
-      language === 'en'
-        ? 'Are you sure you want to logout?'
-        : 'Êtes-vous sûr de vouloir vous déconnecter?',
+      'Logout',
+      'Are you sure you want to logout?',
       [
         {
-          text: language === 'en' ? 'Cancel' : 'Annuler',
+          text: 'Cancel',
           style: 'cancel',
+          onPress: () => console.log('User cancelled logout'),
         },
         {
-          text: language === 'en' ? 'Logout' : 'Déconnexion',
+          text: 'Logout',
           style: 'destructive',
           onPress: async () => {
             console.log('User confirmed logout');
+            setSigningOut(true);
             try {
               await signOut();
-              console.log('User signed out successfully, redirecting to /auth');
-              // Redirect to auth screen after logout
+              console.log('Logout successful, navigating to auth screen');
               router.replace('/auth');
             } catch (error) {
-              console.error('Error signing out:', error);
-              Alert.alert(
-                'Error',
-                'Failed to sign out. Please try again.'
-              );
+              console.error('Error during logout:', error);
+              Alert.alert('Error', 'Failed to logout. Please try again.');
+            } finally {
+              setSigningOut(false);
             }
           },
         },
-      ]
+      ],
+      { cancelable: true }
     );
   };
 
-  const t = {
-    en: {
-      account: 'Account',
-      userInfo: 'User Information',
-      name: 'Name',
-      company: 'Company',
-      dateJoined: 'Date Joined',
-      settings: 'Settings',
-      theme: 'Theme',
-      light: 'Light',
-      dark: 'Dark',
-      language: 'Language',
-      english: 'English',
-      french: 'French',
-      links: 'Links',
-      support: 'Support',
-      leagueRules: 'League Rules',
-      privacyPolicy: 'Privacy Policy',
-      logout: 'Logout',
-    },
-    fr: {
-      account: 'Compte',
-      userInfo: 'Informations utilisateur',
-      name: 'Nom',
-      company: 'Entreprise',
-      dateJoined: 'Date d\'inscription',
-      settings: 'Paramètres',
-      theme: 'Thème',
-      light: 'Clair',
-      dark: 'Sombre',
-      language: 'Langue',
-      english: 'Anglais',
-      french: 'Français',
-      links: 'Liens',
-      support: 'Support',
-      leagueRules: 'Règles de la ligue',
-      privacyPolicy: 'Politique de confidentialité',
-      logout: 'Déconnexion',
-    },
-  };
-
-  const strings = t[language];
+  // Get user display info - prefer profile, fallback to auth user metadata
+  const userName = profile?.name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
+  const userEmail = profile?.email || user?.email || '';
+  const userCompany = profile?.company || user?.user_metadata?.company || '';
+  const dateJoined = profile?.created_at 
+    ? new Date(profile.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    : user?.created_at 
+    ? new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    : 'Unknown';
 
   return (
     <SafeAreaView
@@ -141,199 +99,237 @@ export default function AccountScreen() {
       <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: themeColors.foreground }]}>
-            {strings.account}
+          <Text style={[styles.headerTitle, { color: themeColors.text }]}>
+            Account
           </Text>
           <TouchableOpacity
-            style={styles.notificationButton}
             onPress={() => {
-              console.log('User tapped notifications button');
+              console.log('User tapped notifications icon');
               router.push('/notifications');
             }}
+            style={styles.notificationButton}
           >
             <IconSymbol
               ios_icon_name="bell.fill"
               android_material_icon_name="notifications"
               size={24}
-              color={themeColors.foreground}
+              color={themeColors.text}
             />
             {unreadCount > 0 && (
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationBadgeText}>
-                  {unreadCount > 9 ? '9+' : unreadCount}
-                </Text>
+              <View style={[styles.badge, { backgroundColor: colors.ptoGreen }]}>
+                <Text style={styles.badgeText}>{unreadCount}</Text>
               </View>
             )}
           </TouchableOpacity>
         </View>
 
-        {/* User Information */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: themeColors.foreground }]}>
-            {strings.userInfo}
-          </Text>
-          <View style={[styles.card, { backgroundColor: themeColors.card }]}>
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: effectiveTheme === 'dark' ? themeColors.secondaryText : themeColors.foreground }]}>
-                {strings.name}
-              </Text>
-              <Text style={[styles.infoValue, { color: themeColors.foreground }]}>
-                {userData.name}
-              </Text>
+        {/* User Info Section */}
+        <View style={[styles.section, { backgroundColor: themeColors.card }]}>
+          <View style={styles.userInfoContainer}>
+            <View style={[styles.avatar, { backgroundColor: colors.ptoGreen }]}>
+              <Text style={styles.avatarText}>{userName.charAt(0).toUpperCase()}</Text>
             </View>
-            <View style={[styles.divider, { backgroundColor: themeColors.border }]} />
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: effectiveTheme === 'dark' ? themeColors.secondaryText : themeColors.foreground }]}>
-                {strings.company}
+            <View style={styles.userDetails}>
+              <Text style={[styles.userName, { color: themeColors.text }]}>
+                {userName}
               </Text>
-              <Text style={[styles.infoValue, { color: themeColors.foreground }]}>
-                {userData.company}
-              </Text>
-            </View>
-            <View style={[styles.divider, { backgroundColor: themeColors.border }]} />
-            <View style={styles.infoRow}>
-              <Text style={[styles.infoLabel, { color: effectiveTheme === 'dark' ? themeColors.secondaryText : themeColors.foreground }]}>
-                {strings.dateJoined}
-              </Text>
-              <Text style={[styles.infoValue, { color: themeColors.foreground }]}>
-                {userData.dateJoined}
+              {userEmail && (
+                <Text style={[styles.userEmail, { color: themeColors.mutedText }]}>
+                  {userEmail}
+                </Text>
+              )}
+              {userCompany && (
+                <Text style={[styles.userCompany, { color: themeColors.mutedText }]}>
+                  {userCompany}
+                </Text>
+              )}
+              <Text style={[styles.dateJoined, { color: themeColors.mutedText }]}>
+                Joined {dateJoined}
               </Text>
             </View>
           </View>
         </View>
 
-        {/* Settings */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: themeColors.foreground }]}>
-            {strings.settings}
+        {/* Settings Section */}
+        <View style={styles.sectionContainer}>
+          <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
+            Settings
           </Text>
 
-          {/* Theme Toggle - Only Light and Dark */}
-          <View style={[styles.card, { backgroundColor: themeColors.card }]}>
-            <Text style={[styles.settingLabel, { color: themeColors.foreground }]}>
-              {strings.theme}
+          {/* Theme Toggle */}
+          <View style={[styles.settingCard, { backgroundColor: themeColors.card }]}>
+            <Text style={[styles.settingLabel, { color: themeColors.text }]}>
+              Theme
             </Text>
-            <View style={styles.toggleGroup}>
-              {(['light', 'dark'] as const).map((mode) => (
-                <TouchableOpacity
-                  key={mode}
+            <View style={styles.toggleContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  themeMode === 'light' && styles.toggleButtonActive,
+                  themeMode === 'light' && { backgroundColor: colors.ptoGreen },
+                ]}
+                onPress={() => handleThemeChange('light')}
+              >
+                <Text
                   style={[
-                    styles.toggleButton,
-                    themeMode === mode && {
-                      backgroundColor: colors.ptoGreen,
-                    },
-                    { borderColor: themeColors.border },
+                    styles.toggleButtonText,
+                    { color: themeMode === 'light' ? '#FFFFFF' : themeColors.text },
                   ]}
-                  onPress={() => handleThemeChange(mode)}
                 >
-                  <Text
-                    style={[
-                      styles.toggleButtonText,
-                      {
-                        color:
-                          themeMode === mode
-                            ? '#FFFFFF'
-                            : themeColors.foreground,
-                      },
-                    ]}
-                  >
-                    {strings[mode]}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                  Light
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  themeMode === 'dark' && styles.toggleButtonActive,
+                  themeMode === 'dark' && { backgroundColor: colors.ptoGreen },
+                ]}
+                onPress={() => handleThemeChange('dark')}
+              >
+                <Text
+                  style={[
+                    styles.toggleButtonText,
+                    { color: themeMode === 'dark' ? '#FFFFFF' : themeColors.text },
+                  ]}
+                >
+                  Dark
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
 
           {/* Language Toggle */}
-          <View style={[styles.card, { backgroundColor: themeColors.card }]}>
-            <Text style={[styles.settingLabel, { color: themeColors.foreground }]}>
-              {strings.language}
+          <View style={[styles.settingCard, { backgroundColor: themeColors.card }]}>
+            <Text style={[styles.settingLabel, { color: themeColors.text }]}>
+              Language
             </Text>
-            <View style={styles.toggleGroup}>
-              {(['en', 'fr'] as const).map((lang) => (
-                <TouchableOpacity
-                  key={lang}
+            <View style={styles.toggleContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  language === 'en' && styles.toggleButtonActive,
+                  language === 'en' && { backgroundColor: colors.ptoGreen },
+                ]}
+                onPress={() => handleLanguageChange('en')}
+              >
+                <Text
                   style={[
-                    styles.toggleButton,
-                    language === lang && {
-                      backgroundColor: colors.ptoGreen,
-                    },
-                    { borderColor: themeColors.border },
+                    styles.toggleButtonText,
+                    { color: language === 'en' ? '#FFFFFF' : themeColors.text },
                   ]}
-                  onPress={() => handleLanguageChange(lang)}
                 >
-                  <Text
-                    style={[
-                      styles.toggleButtonText,
-                      {
-                        color:
-                          language === lang
-                            ? '#FFFFFF'
-                            : themeColors.foreground,
-                      },
-                    ]}
-                  >
-                    {lang === 'en' ? strings.english : strings.french}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+                  English
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.toggleButton,
+                  language === 'fr' && styles.toggleButtonActive,
+                  language === 'fr' && { backgroundColor: colors.ptoGreen },
+                ]}
+                onPress={() => handleLanguageChange('fr')}
+              >
+                <Text
+                  style={[
+                    styles.toggleButtonText,
+                    { color: language === 'fr' ? '#FFFFFF' : themeColors.text },
+                  ]}
+                >
+                  French
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
 
-        {/* Links */}
-        <View style={styles.section}>
-          <Text style={[styles.sectionTitle, { color: themeColors.foreground }]}>
-            {strings.links}
+        {/* Links Section */}
+        <View style={styles.sectionContainer}>
+          <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
+            Information
           </Text>
-          <View style={[styles.card, { backgroundColor: themeColors.card }]}>
-            <TouchableOpacity
-              style={styles.linkRow}
-              onPress={() => handleLinkPress('/support', strings.support)}
-            >
-              <Text style={[styles.linkText, { color: colors.ptoGreen }]}>
-                {strings.support}
-              </Text>
-            </TouchableOpacity>
-            <View style={[styles.divider, { backgroundColor: themeColors.border }]} />
-            <TouchableOpacity
-              style={styles.linkRow}
-              onPress={() => handleLinkPress('/league-rules', strings.leagueRules)}
-            >
-              <Text style={[styles.linkText, { color: colors.ptoGreen }]}>
-                {strings.leagueRules}
-              </Text>
-            </TouchableOpacity>
-            <View style={[styles.divider, { backgroundColor: themeColors.border }]} />
-            <TouchableOpacity
-              style={styles.linkRow}
-              onPress={() => handleLinkPress('/privacy-policy', strings.privacyPolicy)}
-            >
-              <Text style={[styles.linkText, { color: colors.ptoGreen }]}>
-                {strings.privacyPolicy}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
 
-        {/* Logout Button */}
-        <View style={styles.section}>
           <TouchableOpacity
-            style={[
-              commonStyles.button,
-              { backgroundColor: themeColors.destructive },
-            ]}
-            onPress={handleLogout}
+            style={[styles.linkCard, { backgroundColor: themeColors.card }]}
+            onPress={() => handleLinkPress('https://publictimeoff.com/support', 'Support')}
           >
-            <Text style={commonStyles.buttonText}>{strings.logout}</Text>
+            <IconSymbol
+              ios_icon_name="questionmark.circle"
+              android_material_icon_name="help"
+              size={24}
+              color={themeColors.text}
+            />
+            <Text style={[styles.linkText, { color: themeColors.text }]}>
+              Support
+            </Text>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={themeColors.mutedText}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.linkCard, { backgroundColor: themeColors.card }]}
+            onPress={() => handleLinkPress('https://publictimeoff.com/league-rules', 'League Rules')}
+          >
+            <IconSymbol
+              ios_icon_name="doc.text"
+              android_material_icon_name="description"
+              size={24}
+              color={themeColors.text}
+            />
+            <Text style={[styles.linkText, { color: themeColors.text }]}>
+              League Rules
+            </Text>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={themeColors.mutedText}
+            />
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.linkCard, { backgroundColor: themeColors.card }]}
+            onPress={() => handleLinkPress('https://publictimeoff.com/privacy-policy', 'Privacy Policy')}
+          >
+            <IconSymbol
+              ios_icon_name="lock.shield"
+              android_material_icon_name="lock"
+              size={24}
+              color={themeColors.text}
+            />
+            <Text style={[styles.linkText, { color: themeColors.text }]}>
+              Privacy Policy
+            </Text>
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="chevron-right"
+              size={20}
+              color={themeColors.mutedText}
+            />
           </TouchableOpacity>
         </View>
 
-        {/* Bottom spacing for tab bar */}
-        <View style={{ height: 40 }} />
+        {/* Logout Button */}
+        <TouchableOpacity
+          style={[styles.logoutButton, { backgroundColor: themeColors.destructive }]}
+          onPress={handleLogout}
+          disabled={signingOut}
+        >
+          <Text style={styles.logoutButtonText}>
+            {signingOut ? 'Logging out...' : 'Logout'}
+          </Text>
+        </TouchableOpacity>
+
+        {/* Bottom Padding for Tab Bar */}
+        <View style={{ height: 100 }} />
       </ScrollView>
     </SafeAreaView>
   );
@@ -347,97 +343,153 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 20,
-    paddingTop: Platform.OS === 'android' ? 20 : 0,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
   },
   header: {
-    paddingVertical: 20,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: spacing.lg,
+    paddingTop: Platform.OS === 'android' ? 48 : 0,
   },
   headerTitle: {
-    fontSize: typography.sizes.h1,
-    fontWeight: typography.weights.bold,
+    fontSize: 32,
+    fontWeight: '700',
+    fontFamily: typography.fontFamily,
   },
   notificationButton: {
-    padding: 8,
     position: 'relative',
+    padding: spacing.xs,
   },
-  notificationBadge: {
+  badge: {
     position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: '#46A758',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
+    top: 0,
+    right: 0,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 4,
   },
-  notificationBadgeText: {
+  badgeText: {
     color: '#FFFFFF',
-    fontSize: 10,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: typography.fontFamily,
   },
   section: {
-    marginBottom: 24,
+    borderRadius: 12,
+    padding: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  userInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  avatarText: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: typography.fontFamily,
+  },
+  userDetails: {
+    flex: 1,
+  },
+  userName: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 4,
+    fontFamily: typography.fontFamily,
+  },
+  userEmail: {
+    fontSize: 14,
+    marginBottom: 2,
+    fontFamily: typography.fontFamily,
+  },
+  userCompany: {
+    fontSize: 14,
+    marginBottom: 2,
+    fontFamily: typography.fontFamily,
+  },
+  dateJoined: {
+    fontSize: 12,
+    fontFamily: typography.fontFamily,
+  },
+  sectionContainer: {
+    marginBottom: spacing.lg,
   },
   sectionTitle: {
-    fontSize: typography.sizes.h3,
-    fontWeight: typography.weights.bold,
-    marginBottom: 12,
+    fontSize: 18,
+    fontWeight: '700',
+    marginBottom: spacing.md,
+    fontFamily: typography.fontFamily,
   },
-  card: {
-    borderRadius: spacing.borderRadius,
-    padding: 16,
-    marginBottom: 12,
-  },
-  infoRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 8,
-  },
-  infoLabel: {
-    fontSize: typography.sizes.body,
-    fontWeight: typography.weights.regular,
-  },
-  infoValue: {
-    fontSize: typography.sizes.body,
-    fontWeight: typography.weights.medium,
-  },
-  divider: {
-    height: 1,
-    marginVertical: 8,
+  settingCard: {
+    borderRadius: 12,
+    padding: spacing.lg,
+    marginBottom: spacing.md,
   },
   settingLabel: {
-    fontSize: typography.sizes.body,
-    fontWeight: typography.weights.medium,
-    marginBottom: 12,
+    fontSize: 16,
+    fontWeight: '500',
+    marginBottom: spacing.md,
+    fontFamily: typography.fontFamily,
   },
-  toggleGroup: {
+  toggleContainer: {
     flexDirection: 'row',
-    gap: 8,
+    gap: spacing.sm,
   },
   toggleButton: {
     flex: 1,
-    height: spacing.buttonHeight,
-    borderRadius: spacing.borderRadius,
-    borderWidth: 1,
-    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: 8,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  toggleButtonActive: {
+    borderWidth: 0,
   },
   toggleButtonText: {
-    fontSize: typography.sizes.body,
-    fontWeight: typography.weights.medium,
+    fontSize: 14,
+    fontWeight: '500',
+    fontFamily: typography.fontFamily,
   },
-  linkRow: {
-    paddingVertical: 12,
+  linkCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    padding: spacing.lg,
+    marginBottom: spacing.sm,
   },
   linkText: {
-    fontSize: typography.sizes.body,
-    fontWeight: typography.weights.medium,
+    flex: 1,
+    fontSize: 16,
+    fontWeight: '500',
+    marginLeft: spacing.md,
+    fontFamily: typography.fontFamily,
+  },
+  logoutButton: {
+    borderRadius: 12,
+    padding: spacing.lg,
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  logoutButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '700',
+    fontFamily: typography.fontFamily,
   },
 });

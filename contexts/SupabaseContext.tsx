@@ -84,15 +84,17 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
         .from('profiles')
         .select('*')
         .eq('id', userId)
-        .single();
+        .maybeSingle(); // Use maybeSingle() instead of single() to handle missing rows gracefully
 
       if (error) {
         console.error('Error fetching profile:', error);
-        // Profile might not exist yet, that's okay
         setProfile(null);
-      } else {
+      } else if (data) {
         console.log('Profile fetched successfully:', data);
         setProfile(data);
+      } else {
+        console.log('No profile found for user, this is okay - profile may not exist yet');
+        setProfile(null);
       }
     } catch (error) {
       console.error('Exception fetching profile:', error);
