@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { useColorScheme } from "react-native";
+import { useColorScheme, View, ActivityIndicator } from "react-native";
 import { Stack } from "expo-router";
 import "react-native-reanimated";
 import { StatusBar } from "expo-status-bar";
@@ -35,8 +35,13 @@ function RootLayoutContent() {
     }
   }, [loaded]);
 
+  // Show loading screen while fonts are loading
   if (!loaded) {
-    return null;
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.ptoGreen }}>
+        <ActivityIndicator size="large" color="#FFFFFF" />
+      </View>
+    );
   }
 
   // Custom theme based on PTO colors

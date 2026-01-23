@@ -1,12 +1,12 @@
 
-import React, { useRef, useEffect } from 'react';
-import { View, StyleSheet, ActivityIndicator } from 'react-native';
+import React, { useRef, useEffect, useState } from 'react';
+import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { WebView, WebViewMessageEvent, WebViewNavigation } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
 import { useSupabase } from '@/contexts/SupabaseContext';
-import { colors } from '@/styles/commonStyles';
+import { colors, typography } from '@/styles/commonStyles';
 import { supabase } from '@/lib/supabase';
 
 const BASE_URL = 'https://publictimeoff.com';
@@ -17,9 +17,10 @@ export default function AuthScreen() {
   const router = useRouter();
   const webViewRef = useRef<WebView>(null);
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
-  const hasCheckedSessionRef = useRef(false);
+  const [isCheckingAuth, setIsCheckingAuth] = useState(false);
+  const [webViewKey, setWebViewKey] = useState(0);
 
-  console.log('AuthScreen - User:', user ? 'Logged in' : 'Not logged in', 'Loading:', loading);
+  console.log('AuthScreen - User:', user ? 'Logged in' : 'Not logged in', 'Loading:', loading, 'Checking:', isCheckingAuth);
 
   // Redirect to dashboard if user is authenticated
   useEffect(() => {
@@ -29,26 +30,54 @@ export default function AuthScreen() {
     }
   }, [user, loading, router]);
 
-  // Handle navigation state changes - detect when user navigates away from /auth
+  // Handle navigation state changes
   const handleNavigationStateChange = async (navState: WebViewNavigation) => {
     const url = navState.url;
     console.log('AuthScreen: WebView navigated to:', url);
 
-    // If the user navigates away from /auth (e.g., to /participant or /dashboard),
-    // it means they successfully logged in. Check the session.
-    if (!url.includes('/auth') && !hasCheckedSessionRef.current) {
-      console.log('AuthScreen: User navigated away from /auth, checking session...');
-      hasCheckedSessionRef.current = true;
+    // If navigating to participant/dashboard pages, user is likely authenticated
+    const isParticipantPage = url.includes('/participant') || url.includes('/dashboard') || url.includes('/rankings');
+    
+    if (isParticipantPage && !isCheckingAuth) {
+      console.log('AuthScreen: User navigated to authenticated page, requesting session from WebView...');
+      setIsCheckingAuth(true);
       
-      // Wait a moment for cookies to sync
-      setTimeout(async () => {
-        console.log('AuthScreen: Checking session after navigation');
-        await checkSession();
-      }, 500);
+      // Request the session from the WebView
+      const requestSessionScript = `
+        (function() {
+          if (typeof window.supabase !== 'undefined') {
+            window.supabase.auth.getSession().then(({ data: { session } }) => {
+              if (session && window.ReactNativeWebView) {
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'SUPABASE_AUTH_SUCCESS',
+                  session: session
+                }));
+                console.log('Sent session to React Native app');
+              } else {
+                console.log('No session found or ReactNativeWebView not available');
+              }
+            });
+          } else {
+            console.log('Supabase not available on window');
+          }
+        })();
+        true;
+      `;
+      
+      webViewRef.current?.injectJavaScript(requestSessionScript);
+      
+      // Fallback: If we don't receive a message within 2 seconds, reload the WebView
+      setTimeout(() => {
+        if (isCheckingAuth) {
+          console.log('AuthScreen: No session received from WebView, reloading...');
+          setIsCheckingAuth(false);
+          setWebViewKey(prev => prev + 1);
+        }
+      }, 2000);
     }
   };
 
-  // Handle messages from the WebView (backup method)
+  // Handle messages from the WebView
   const handleWebViewMessage = async (event: WebViewMessageEvent) => {
     try {
       const message = JSON.parse(event.nativeEvent.data);
@@ -56,6 +85,7 @@ export default function AuthScreen() {
 
       if (message.type === 'SUPABASE_AUTH_SUCCESS' && message.session) {
         console.log('AuthScreen: Setting session from WebView message');
+        setIsCheckingAuth(true);
         
         // Set the session in the native Supabase client
         const { data, error } = await supabase.auth.setSession({
@@ -65,78 +95,72 @@ export default function AuthScreen() {
 
         if (error) {
           console.error('AuthScreen: Error setting session:', error);
+          setIsCheckingAuth(false);
         } else {
           console.log('AuthScreen: Session set successfully, user:', data.user?.email);
           // The onAuthStateChange listener in SupabaseContext will handle the rest
+          // Don't set isCheckingAuth to false here - let the redirect happen
         }
       }
     } catch (error) {
       console.error('AuthScreen: Error handling WebView message:', error);
+      setIsCheckingAuth(false);
     }
   };
 
-  // Inject JavaScript to listen for Supabase auth events and send them to React Native
+  // Inject JavaScript to listen for Supabase auth events
   const injectedJavaScript = `
     (function() {
-      console.log('AuthScreen injected script: Setting up Supabase auth listener');
+      console.log('AuthScreen: Injected script running');
       
       // Function to send message to React Native
       function sendMessageToApp(type, data) {
         if (window.ReactNativeWebView) {
           window.ReactNativeWebView.postMessage(JSON.stringify({ type, ...data }));
-          console.log('AuthScreen injected script: Sent message to app:', type);
+          console.log('AuthScreen: Sent message to app:', type);
+        } else {
+          console.log('AuthScreen: ReactNativeWebView not available');
         }
       }
 
-      // Check if Supabase is available
-      if (typeof window.supabase !== 'undefined') {
-        console.log('AuthScreen injected script: Supabase client found');
-        
-        // Listen for auth state changes
-        window.supabase.auth.onAuthStateChange((event, session) => {
-          console.log('AuthScreen injected script: Auth state changed:', event);
+      // Function to check and send session
+      function checkAndSendSession() {
+        if (typeof window.supabase !== 'undefined') {
+          console.log('AuthScreen: Supabase client found, checking session');
           
-          if (event === 'SIGNED_IN' && session) {
-            console.log('AuthScreen injected script: User signed in, sending session to app');
-            sendMessageToApp('SUPABASE_AUTH_SUCCESS', { session });
-          }
-        });
-
-        // Also check for existing session immediately
-        window.supabase.auth.getSession().then(({ data: { session } }) => {
-          if (session) {
-            console.log('AuthScreen injected script: Existing session found, sending to app');
-            sendMessageToApp('SUPABASE_AUTH_SUCCESS', { session });
-          }
-        });
-      } else {
-        console.log('AuthScreen injected script: Supabase client not found, will retry');
-        
-        // Retry after a delay if Supabase isn't loaded yet
-        setTimeout(() => {
-          if (typeof window.supabase !== 'undefined') {
-            console.log('AuthScreen injected script: Supabase client found on retry');
-            
-            window.supabase.auth.onAuthStateChange((event, session) => {
-              console.log('AuthScreen injected script: Auth state changed:', event);
-              
-              if (event === 'SIGNED_IN' && session) {
-                console.log('AuthScreen injected script: User signed in, sending session to app');
-                sendMessageToApp('SUPABASE_AUTH_SUCCESS', { session });
-              }
-            });
-
-            window.supabase.auth.getSession().then(({ data: { session } }) => {
-              if (session) {
-                console.log('AuthScreen injected script: Existing session found, sending to app');
-                sendMessageToApp('SUPABASE_AUTH_SUCCESS', { session });
-              }
-            });
-          }
-        }, 1000);
+          window.supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session) {
+              console.log('AuthScreen: Session found, sending to app');
+              sendMessageToApp('SUPABASE_AUTH_SUCCESS', { session });
+            } else {
+              console.log('AuthScreen: No session found');
+            }
+          }).catch(err => {
+            console.error('AuthScreen: Error getting session:', err);
+          });
+          
+          // Also listen for future auth changes
+          window.supabase.auth.onAuthStateChange((event, session) => {
+            console.log('AuthScreen: Auth state changed:', event);
+            if (event === 'SIGNED_IN' && session) {
+              console.log('AuthScreen: User signed in, sending session to app');
+              sendMessageToApp('SUPABASE_AUTH_SUCCESS', { session });
+            }
+          });
+        } else {
+          console.log('AuthScreen: Supabase not found, will retry');
+        }
       }
+
+      // Try immediately
+      checkAndSendSession();
+      
+      // Retry after delays in case Supabase loads later
+      setTimeout(checkAndSendSession, 500);
+      setTimeout(checkAndSendSession, 1000);
+      setTimeout(checkAndSendSession, 2000);
     })();
-    true; // Required for iOS
+    true;
   `;
 
   // Build the auth URL
@@ -149,12 +173,16 @@ export default function AuthScreen() {
       style={[styles.container, { backgroundColor: themeColors.background }]}
       edges={['top', 'bottom']}
     >
-      {loading ? (
+      {loading || isCheckingAuth ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.ptoGreen} />
+          <Text style={[styles.loadingText, { color: themeColors.text }]}>
+            {isCheckingAuth ? 'Signing you in...' : 'Loading...'}
+          </Text>
         </View>
       ) : (
         <WebView
+          key={webViewKey}
           ref={webViewRef}
           source={{ uri: authUrl }}
           style={styles.webview}
@@ -198,5 +226,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    fontFamily: typography.regular,
   },
 });
