@@ -5,15 +5,12 @@ import { WebView, WebViewMessageEvent, WebViewNavigation } from 'react-native-we
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useSupabase } from '@/contexts/SupabaseContext';
 import { colors, typography } from '@/styles/commonStyles';
-import { supabase } from '@/lib/supabase';
 
 const BASE_URL = 'https://publictimeoff.com';
 
 export default function AuthScreen() {
   const { effectiveTheme } = useTheme();
-  const { user, loading } = useSupabase();
   const router = useRouter();
   const webViewRef = useRef<WebView>(null);
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
@@ -21,15 +18,7 @@ export default function AuthScreen() {
   const hasAttemptedAuthRef = useRef(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  console.log('AuthScreen - User:', user ? 'Logged in' : 'Not logged in', 'Loading:', loading, 'Checking:', isCheckingAuth);
-
-  // Redirect to dashboard if user is authenticated
-  useEffect(() => {
-    if (!loading && user) {
-      console.log('User authenticated, redirecting to dashboard');
-      router.replace('/(tabs)/dashboard');
-    }
-  }, [user, loading, router]);
+  console.log('AuthScreen - Checking:', isCheckingAuth);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -59,69 +48,10 @@ export default function AuthScreen() {
       hasAttemptedAuthRef.current = true;
       setIsCheckingAuth(true);
       
-      // Request authentication token from the WebView
-      const requestAuthScript = `
-        (function() {
-          console.log('AuthScreen: Requesting authentication from web app');
-          
-          // Try multiple methods to get authentication data
-          
-          // Method 1: Check if web app exposes auth data
-          if (window.ReactNativeWebView) {
-            // Request auth data from the web app
-            const event = new CustomEvent('requestAuth', { 
-              detail: { source: 'react-native-app' } 
-            });
-            window.dispatchEvent(event);
-            
-            // Method 2: Check for Supabase session
-            if (typeof window.supabase !== 'undefined') {
-              window.supabase.auth.getSession().then(({ data: { session } }) => {
-                if (session) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({
-                    type: 'AUTH_SUCCESS',
-                    session: session
-                  }));
-                  console.log('AuthScreen: Sent Supabase session to app');
-                }
-              }).catch(err => {
-                console.error('AuthScreen: Error getting Supabase session:', err);
-              });
-            }
-            
-            // Method 3: Check for auth cookies or localStorage
-            try {
-              const authData = localStorage.getItem('supabase.auth.token');
-              if (authData) {
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'AUTH_SUCCESS',
-                  authData: authData
-                }));
-                console.log('AuthScreen: Sent localStorage auth to app');
-              }
-            } catch (e) {
-              console.error('AuthScreen: Error reading localStorage:', e);
-            }
-            
-            // Method 4: Just signal that user is authenticated
-            // The app will continue with WebView-based auth
-            setTimeout(() => {
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'AUTH_DETECTED',
-                url: window.location.href
-              }));
-              console.log('AuthScreen: Sent auth detected signal');
-            }, 500);
-          }
-        })();
-        true;
-      `;
-      
-      webViewRef.current?.injectJavaScript(requestAuthScript);
-      
-      // Increased timeout to 5 seconds to allow app to process authentication
+      // Give the web app 5 seconds to fully load and establish session
+      // The WebView cookies will be shared with the dashboard
       timeoutRef.current = setTimeout(() => {
-        console.log('AuthScreen: Timeout reached after 5 seconds - proceeding to dashboard');
+        console.log('AuthScreen: Authentication complete - redirecting to dashboard');
         console.log('AuthScreen: User authenticated via web cookies');
         setIsCheckingAuth(false);
         router.replace('/(tabs)/dashboard');
@@ -129,113 +59,10 @@ export default function AuthScreen() {
     }
   };
 
-  // Handle messages from the WebView
-  const handleWebViewMessage = async (event: WebViewMessageEvent) => {
-    try {
-      const message = JSON.parse(event.nativeEvent.data);
-      console.log('AuthScreen: Received message from WebView:', message.type);
-
-      if (message.type === 'AUTH_SUCCESS' && message.session) {
-        console.log('AuthScreen: Received Supabase session from WebView');
-        
-        // Clear the timeout since we got a response
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
-        
-        // Set the session in the native Supabase client
-        const { data, error } = await supabase.auth.setSession({
-          access_token: message.session.access_token,
-          refresh_token: message.session.refresh_token,
-        });
-
-        if (error) {
-          console.error('AuthScreen: Error setting session:', error);
-          // Even if session setting fails, user might be authenticated via web cookies
-          console.log('AuthScreen: Proceeding to dashboard despite session error');
-          setIsCheckingAuth(false);
-          router.replace('/(tabs)/dashboard');
-        } else {
-          console.log('AuthScreen: Session set successfully, user:', data.user?.email);
-          setIsCheckingAuth(false);
-          // The onAuthStateChange listener will handle navigation
-        }
-      } else if (message.type === 'AUTH_DETECTED') {
-        console.log('AuthScreen: Authentication detected, proceeding to dashboard');
-        
-        // Clear the timeout since we got a response
-        if (timeoutRef.current) {
-          clearTimeout(timeoutRef.current);
-          timeoutRef.current = null;
-        }
-        
-        setIsCheckingAuth(false);
-        router.replace('/(tabs)/dashboard');
-      }
-    } catch (error) {
-      console.error('AuthScreen: Error handling WebView message:', error);
-      // Don't block the user - they might still be authenticated via web cookies
-      console.log('AuthScreen: Proceeding to dashboard despite message error');
-      
-      // Clear the timeout
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-      
-      setIsCheckingAuth(false);
-      router.replace('/(tabs)/dashboard');
-    }
-  };
-
-  // Inject JavaScript to listen for auth events
-  const injectedJavaScript = `
-    (function() {
-      console.log('AuthScreen: Injected script initialized');
-      
-      // Listen for custom auth request events from the app
-      window.addEventListener('requestAuth', function(event) {
-        console.log('AuthScreen: Received requestAuth event');
-      });
-      
-      // Check if user is already on an authenticated page
-      const isAuthPage = window.location.pathname.includes('/participant') ||
-                         window.location.pathname.includes('/dashboard') ||
-                         window.location.pathname.includes('/rankings');
-      
-      if (isAuthPage && window.ReactNativeWebView) {
-        console.log('AuthScreen: Already on authenticated page, signaling to app');
-        window.ReactNativeWebView.postMessage(JSON.stringify({
-          type: 'AUTH_DETECTED',
-          url: window.location.href
-        }));
-      }
-    })();
-    true;
-  `;
-
   // Build the auth URL
   const authUrl = `${BASE_URL}/auth?source=app`;
 
   console.log('Loading auth WebView with URL:', authUrl);
-
-  // Show loading screen only when Supabase is loading
-  if (loading) {
-    return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: colors.ptoGreen }]}
-        edges={['top', 'bottom']}
-      >
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FFFFFF" />
-          <Text style={styles.loadingTextWhite}>
-            Loading...
-          </Text>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   // Show native green screen while checking auth
   if (isCheckingAuth) {
@@ -283,8 +110,6 @@ export default function AuthScreen() {
           console.error('WebView error loading auth page:', nativeEvent);
         }}
         onNavigationStateChange={handleNavigationStateChange}
-        onMessage={handleWebViewMessage}
-        injectedJavaScript={injectedJavaScript}
         sharedCookiesEnabled={true}
         thirdPartyCookiesEnabled={true}
         javaScriptEnabled={true}

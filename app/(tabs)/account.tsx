@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,25 +11,63 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import * as WebBrowser from 'expo-web-browser';
 import { IconSymbol } from '@/components/IconSymbol';
-import { useTheme } from '@/contexts/ThemeContext';
-import { useSupabase } from '@/contexts/SupabaseContext';
 import { useNotifications } from '@/contexts/NotificationContext';
+import { useTheme } from '@/contexts/ThemeContext';
 import { colors, typography, spacing, commonStyles } from '@/styles/commonStyles';
+import * as WebBrowser from 'expo-web-browser';
+import { WebView } from 'react-native-webview';
+
+const BASE_URL = 'https://publictimeoff.com';
 
 export default function AccountScreen() {
+  const { unreadCount } = useNotifications();
+  const { theme, setTheme, language, setLanguage, effectiveTheme } = useTheme();
   const router = useRouter();
-  const { effectiveTheme, setThemeMode, themeMode, language, setLanguage } = useTheme();
-  const { user, profile, signOut, loading } = useSupabase();
-  const { notifications, unreadCount } = useNotifications();
-  const [signingOut, setSigningOut] = useState(false);
-
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
+  const [userName, setUserName] = useState('User');
+  const [userEmail, setUserEmail] = useState('');
+  const [dateJoined, setDateJoined] = useState('');
+  const webViewRef = useRef<WebView>(null);
+
+  console.log('AccountScreen - Theme:', effectiveTheme, 'Language:', language);
+
+  // Request user info from WebView on mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (webViewRef.current) {
+        console.log('AccountScreen: Requesting user info from WebView');
+        const script = `
+          (function() {
+            try {
+              // Try to get user info from the web app
+              if (window.ReactNativeWebView) {
+                // Check if user data is available
+                const userDataStr = localStorage.getItem('user_data');
+                if (userDataStr) {
+                  const userData = JSON.parse(userDataStr);
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'USER_INFO',
+                    data: userData
+                  }));
+                }
+              }
+            } catch (e) {
+              console.error('Error getting user info:', e);
+            }
+          })();
+          true;
+        `;
+        webViewRef.current.injectJavaScript(script);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleThemeChange = (mode: 'light' | 'dark') => {
     console.log('User changed theme to:', mode);
-    setThemeMode(mode);
+    setTheme(mode);
   };
 
   const handleLanguageChange = (lang: 'en' | 'fr') => {
@@ -38,9 +76,12 @@ export default function AccountScreen() {
   };
 
   const handleLinkPress = async (url: string, title: string) => {
-    console.log('User tapped link:', title, url);
+    console.log('User tapped link:', title, 'URL:', url);
     try {
-      await WebBrowser.openBrowserAsync(url);
+      await WebBrowser.openBrowserAsync(url, {
+        presentationStyle: WebBrowser.WebBrowserPresentationStyle.PAGE_SHEET,
+        controlsColor: colors.ptoGreen,
+      });
     } catch (error) {
       console.error('Error opening browser:', error);
       Alert.alert('Error', 'Could not open link');
@@ -50,8 +91,8 @@ export default function AccountScreen() {
   const handleLogout = () => {
     console.log('User tapped logout button');
     Alert.alert(
-      'Logout',
-      'Are you sure you want to logout?',
+      'Sign Out',
+      'Are you sure you want to sign out?',
       [
         {
           text: 'Cancel',
@@ -59,125 +100,179 @@ export default function AccountScreen() {
           onPress: () => console.log('User cancelled logout'),
         },
         {
-          text: 'Logout',
+          text: 'Sign Out',
           style: 'destructive',
           onPress: async () => {
-            console.log('User confirmed logout');
-            setSigningOut(true);
-            try {
-              await signOut();
-              console.log('Logout successful, navigating to auth screen');
-              router.replace('/auth');
-            } catch (error) {
-              console.error('Error during logout:', error);
-              Alert.alert('Error', 'Failed to logout. Please try again.');
-            } finally {
-              setSigningOut(false);
+            console.log('User confirmed logout, signing out');
+            
+            // Clear WebView cookies and redirect to auth
+            if (webViewRef.current) {
+              const script = `
+                (function() {
+                  try {
+                    // Clear localStorage
+                    localStorage.clear();
+                    
+                    // Redirect to logout endpoint
+                    window.location.href = '${BASE_URL}/auth/logout?source=app';
+                  } catch (e) {
+                    console.error('Error during logout:', e);
+                  }
+                })();
+                true;
+              `;
+              webViewRef.current.injectJavaScript(script);
             }
+            
+            // Redirect to auth screen
+            router.replace('/auth');
           },
         },
-      ],
-      { cancelable: true }
+      ]
     );
   };
 
-  // Get user display info - prefer profile, fallback to auth user metadata
-  const userName = profile?.name || user?.user_metadata?.name || user?.email?.split('@')[0] || 'User';
-  const userEmail = profile?.email || user?.email || '';
-  const userCompany = profile?.company || user?.user_metadata?.company || '';
-  const dateJoined = profile?.created_at 
-    ? new Date(profile.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-    : user?.created_at 
-    ? new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
-    : 'Unknown';
+  const handleWebViewMessage = (event: any) => {
+    try {
+      const message = JSON.parse(event.nativeEvent.data);
+      console.log('AccountScreen: Received message from WebView:', message.type);
+
+      if (message.type === 'USER_INFO' && message.data) {
+        console.log('AccountScreen: Received user info:', message.data);
+        if (message.data.name) setUserName(message.data.name);
+        if (message.data.email) setUserEmail(message.data.email);
+        if (message.data.created_at) {
+          const date = new Date(message.data.created_at);
+          setDateJoined(date.toLocaleDateString());
+        }
+      }
+    } catch (error) {
+      console.error('AccountScreen: Error handling WebView message:', error);
+    }
+  };
+
+  const themeText = theme === 'system' ? 'System Default' : theme === 'dark' ? 'Dark' : 'Light';
+  const languageText = language === 'en' ? 'English' : 'Français';
 
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: themeColors.background }]}
       edges={['top']}
     >
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.headerTitle, { color: themeColors.text }]}>
-            Account
-          </Text>
-          <TouchableOpacity
-            onPress={() => {
-              console.log('User tapped notifications icon');
-              router.push('/notifications');
-            }}
-            style={styles.notificationButton}
-          >
-            <IconSymbol
-              ios_icon_name="bell.fill"
-              android_material_icon_name="notifications"
-              size={24}
-              color={themeColors.text}
-            />
-            {unreadCount > 0 && (
-              <View style={[styles.badge, { backgroundColor: colors.ptoGreen }]}>
-                <Text style={styles.badgeText}>{unreadCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        </View>
+      {/* Hidden WebView to communicate with web app */}
+      <View style={{ height: 0, width: 0, overflow: 'hidden' }}>
+        <WebView
+          ref={webViewRef}
+          source={{ uri: `${BASE_URL}/${language}/participant?source=app` }}
+          onMessage={handleWebViewMessage}
+          sharedCookiesEnabled={true}
+          thirdPartyCookiesEnabled={true}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+        />
+      </View>
 
+      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
         {/* User Info Section */}
-        <View style={[styles.section, { backgroundColor: themeColors.card }]}>
+        <View style={[styles.section, { backgroundColor: themeColors.cardBackground }]}>
           <View style={styles.userInfoContainer}>
-            <View style={[styles.avatar, { backgroundColor: colors.ptoGreen }]}>
-              <Text style={styles.avatarText}>{userName.charAt(0).toUpperCase()}</Text>
+            <View style={[styles.avatarPlaceholder, { backgroundColor: colors.ptoGreen }]}>
+              <Text style={styles.avatarText}>
+                {userName.charAt(0).toUpperCase()}
+              </Text>
             </View>
             <View style={styles.userDetails}>
               <Text style={[styles.userName, { color: themeColors.text }]}>
                 {userName}
               </Text>
-              {userEmail && (
+              {userEmail ? (
                 <Text style={[styles.userEmail, { color: themeColors.mutedText }]}>
                   {userEmail}
                 </Text>
-              )}
-              {userCompany && (
-                <Text style={[styles.userCompany, { color: themeColors.mutedText }]}>
-                  {userCompany}
+              ) : null}
+              {dateJoined ? (
+                <Text style={[styles.dateJoined, { color: themeColors.mutedText }]}>
+                  Joined
                 </Text>
-              )}
-              <Text style={[styles.dateJoined, { color: themeColors.mutedText }]}>
-                Joined {dateJoined}
-              </Text>
+              ) : null}
+              {dateJoined ? (
+                <Text style={[styles.dateJoined, { color: themeColors.mutedText }]}>
+                  {dateJoined}
+                </Text>
+              ) : null}
             </View>
           </View>
         </View>
 
+        {/* Notifications */}
+        <TouchableOpacity
+          style={[styles.section, styles.notificationSection, { backgroundColor: themeColors.cardBackground }]}
+          onPress={() => {
+            console.log('User tapped notifications');
+            router.push('/notifications');
+          }}
+        >
+          <View style={styles.sectionHeader}>
+            <IconSymbol
+              ios_icon_name="bell.fill"
+              android_material_icon_name="notifications"
+              size={24}
+              color={colors.ptoGreen}
+            />
+            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
+              Notifications
+            </Text>
+          </View>
+          <View style={styles.notificationBadgeContainer}>
+            {unreadCount > 0 ? (
+              <View style={styles.notificationBadge}>
+                <Text style={styles.notificationBadgeText}>
+                  {unreadCount}
+                </Text>
+              </View>
+            ) : null}
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="arrow-forward"
+              size={20}
+              color={themeColors.mutedText}
+            />
+          </View>
+        </TouchableOpacity>
+
         {/* Settings Section */}
-        <View style={styles.sectionContainer}>
-          <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
-            Settings
-          </Text>
+        <View style={[styles.section, { backgroundColor: themeColors.cardBackground }]}>
+          <View style={styles.sectionHeader}>
+            <IconSymbol
+              ios_icon_name="gear"
+              android_material_icon_name="settings"
+              size={24}
+              color={colors.ptoGreen}
+            />
+            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
+              Settings
+            </Text>
+          </View>
 
           {/* Theme Toggle */}
-          <View style={[styles.settingCard, { backgroundColor: themeColors.card }]}>
+          <View style={styles.settingRow}>
             <Text style={[styles.settingLabel, { color: themeColors.text }]}>
               Theme
             </Text>
-            <View style={styles.toggleContainer}>
+            <View style={styles.themeButtons}>
               <TouchableOpacity
                 style={[
-                  styles.toggleButton,
-                  themeMode === 'light' && styles.toggleButtonActive,
-                  themeMode === 'light' && { backgroundColor: colors.ptoGreen },
+                  styles.themeButton,
+                  theme === 'light' && styles.themeButtonActive,
+                  { borderColor: themeColors.border },
                 ]}
                 onPress={() => handleThemeChange('light')}
               >
                 <Text
                   style={[
-                    styles.toggleButtonText,
-                    { color: themeMode === 'light' ? '#FFFFFF' : themeColors.text },
+                    styles.themeButtonText,
+                    { color: themeColors.text },
+                    theme === 'light' && styles.themeButtonTextActive,
                   ]}
                 >
                   Light
@@ -185,16 +280,17 @@ export default function AccountScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
-                  styles.toggleButton,
-                  themeMode === 'dark' && styles.toggleButtonActive,
-                  themeMode === 'dark' && { backgroundColor: colors.ptoGreen },
+                  styles.themeButton,
+                  theme === 'dark' && styles.themeButtonActive,
+                  { borderColor: themeColors.border },
                 ]}
                 onPress={() => handleThemeChange('dark')}
               >
                 <Text
                   style={[
-                    styles.toggleButtonText,
-                    { color: themeMode === 'dark' ? '#FFFFFF' : themeColors.text },
+                    styles.themeButtonText,
+                    { color: themeColors.text },
+                    theme === 'dark' && styles.themeButtonTextActive,
                   ]}
                 >
                   Dark
@@ -204,23 +300,24 @@ export default function AccountScreen() {
           </View>
 
           {/* Language Toggle */}
-          <View style={[styles.settingCard, { backgroundColor: themeColors.card }]}>
+          <View style={styles.settingRow}>
             <Text style={[styles.settingLabel, { color: themeColors.text }]}>
               Language
             </Text>
-            <View style={styles.toggleContainer}>
+            <View style={styles.themeButtons}>
               <TouchableOpacity
                 style={[
-                  styles.toggleButton,
-                  language === 'en' && styles.toggleButtonActive,
-                  language === 'en' && { backgroundColor: colors.ptoGreen },
+                  styles.themeButton,
+                  language === 'en' && styles.themeButtonActive,
+                  { borderColor: themeColors.border },
                 ]}
                 onPress={() => handleLanguageChange('en')}
               >
                 <Text
                   style={[
-                    styles.toggleButtonText,
-                    { color: language === 'en' ? '#FFFFFF' : themeColors.text },
+                    styles.themeButtonText,
+                    { color: themeColors.text },
+                    language === 'en' && styles.themeButtonTextActive,
                   ]}
                 >
                   English
@@ -228,19 +325,20 @@ export default function AccountScreen() {
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
-                  styles.toggleButton,
-                  language === 'fr' && styles.toggleButtonActive,
-                  language === 'fr' && { backgroundColor: colors.ptoGreen },
+                  styles.themeButton,
+                  language === 'fr' && styles.themeButtonActive,
+                  { borderColor: themeColors.border },
                 ]}
                 onPress={() => handleLanguageChange('fr')}
               >
                 <Text
                   style={[
-                    styles.toggleButtonText,
-                    { color: language === 'fr' ? '#FFFFFF' : themeColors.text },
+                    styles.themeButtonText,
+                    { color: themeColors.text },
+                    language === 'fr' && styles.themeButtonTextActive,
                   ]}
                 >
-                  French
+                  Français
                 </Text>
               </TouchableOpacity>
             </View>
@@ -248,69 +346,51 @@ export default function AccountScreen() {
         </View>
 
         {/* Links Section */}
-        <View style={styles.sectionContainer}>
-          <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
-            Information
-          </Text>
-
+        <View style={[styles.section, { backgroundColor: themeColors.cardBackground }]}>
           <TouchableOpacity
-            style={[styles.linkCard, { backgroundColor: themeColors.card }]}
-            onPress={() => handleLinkPress('https://publictimeoff.com/support', 'Support')}
+            style={styles.linkRow}
+            onPress={() => handleLinkPress(`${BASE_URL}/support`, 'Support')}
           >
-            <IconSymbol
-              ios_icon_name="questionmark.circle"
-              android_material_icon_name="help"
-              size={24}
-              color={themeColors.text}
-            />
             <Text style={[styles.linkText, { color: themeColors.text }]}>
               Support
             </Text>
             <IconSymbol
               ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
+              android_material_icon_name="arrow-forward"
               size={20}
               color={themeColors.mutedText}
             />
           </TouchableOpacity>
 
+          <View style={[styles.linkDivider, { backgroundColor: themeColors.border }]} />
+
           <TouchableOpacity
-            style={[styles.linkCard, { backgroundColor: themeColors.card }]}
-            onPress={() => handleLinkPress('https://publictimeoff.com/league-rules', 'League Rules')}
+            style={styles.linkRow}
+            onPress={() => handleLinkPress(`${BASE_URL}/league-rules`, 'League Rules')}
           >
-            <IconSymbol
-              ios_icon_name="doc.text"
-              android_material_icon_name="description"
-              size={24}
-              color={themeColors.text}
-            />
             <Text style={[styles.linkText, { color: themeColors.text }]}>
               League Rules
             </Text>
             <IconSymbol
               ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
+              android_material_icon_name="arrow-forward"
               size={20}
               color={themeColors.mutedText}
             />
           </TouchableOpacity>
 
+          <View style={[styles.linkDivider, { backgroundColor: themeColors.border }]} />
+
           <TouchableOpacity
-            style={[styles.linkCard, { backgroundColor: themeColors.card }]}
-            onPress={() => handleLinkPress('https://publictimeoff.com/privacy-policy', 'Privacy Policy')}
+            style={styles.linkRow}
+            onPress={() => handleLinkPress(`${BASE_URL}/privacy-policy`, 'Privacy Policy')}
           >
-            <IconSymbol
-              ios_icon_name="lock.shield"
-              android_material_icon_name="lock"
-              size={24}
-              color={themeColors.text}
-            />
             <Text style={[styles.linkText, { color: themeColors.text }]}>
               Privacy Policy
             </Text>
             <IconSymbol
               ios_icon_name="chevron.right"
-              android_material_icon_name="chevron-right"
+              android_material_icon_name="arrow-forward"
               size={20}
               color={themeColors.mutedText}
             />
@@ -319,17 +399,18 @@ export default function AccountScreen() {
 
         {/* Logout Button */}
         <TouchableOpacity
-          style={[styles.logoutButton, { backgroundColor: themeColors.destructive }]}
+          style={[styles.logoutButton, { backgroundColor: themeColors.cardBackground }]}
           onPress={handleLogout}
-          disabled={signingOut}
         >
           <Text style={styles.logoutButtonText}>
-            {signingOut ? 'Logging out...' : 'Logout'}
+            Sign Out
           </Text>
         </TouchableOpacity>
 
-        {/* Bottom Padding for Tab Bar */}
-        <View style={{ height: 100 }} />
+        {/* Version Info */}
+        <Text style={[styles.versionText, { color: themeColors.mutedText }]}>
+          Version 1.0.0
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -343,153 +424,143 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-    paddingTop: Platform.OS === 'android' ? 48 : 0,
-  },
-  headerTitle: {
-    fontSize: 32,
-    fontWeight: '700',
-    fontFamily: typography.fontFamily,
-  },
-  notificationButton: {
-    position: 'relative',
-    padding: spacing.xs,
-  },
-  badge: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 4,
-  },
-  badgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
-    fontFamily: typography.fontFamily,
+    padding: spacing.md,
+    paddingBottom: 100, // Extra padding for tab bar
   },
   section: {
     borderRadius: 12,
     padding: spacing.lg,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
+    ...commonStyles.cardShadow,
+  },
+  notificationSection: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontFamily: typography.bold,
+    marginLeft: spacing.sm,
   },
   userInfoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
-  avatar: {
+  avatarPlaceholder: {
     width: 64,
     height: 64,
     borderRadius: 32,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
   },
   avatarText: {
     fontSize: 28,
-    fontWeight: '700',
+    fontFamily: typography.bold,
     color: '#FFFFFF',
-    fontFamily: typography.fontFamily,
   },
   userDetails: {
+    marginLeft: spacing.md,
     flex: 1,
   },
   userName: {
     fontSize: 20,
-    fontWeight: '700',
+    fontFamily: typography.bold,
     marginBottom: 4,
-    fontFamily: typography.fontFamily,
   },
   userEmail: {
     fontSize: 14,
-    marginBottom: 2,
-    fontFamily: typography.fontFamily,
-  },
-  userCompany: {
-    fontSize: 14,
-    marginBottom: 2,
-    fontFamily: typography.fontFamily,
+    fontFamily: typography.regular,
+    marginBottom: 4,
   },
   dateJoined: {
     fontSize: 12,
-    fontFamily: typography.fontFamily,
+    fontFamily: typography.regular,
   },
-  sectionContainer: {
-    marginBottom: spacing.lg,
+  notificationBadgeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: spacing.md,
-    fontFamily: typography.fontFamily,
-  },
-  settingCard: {
+  notificationBadge: {
+    backgroundColor: colors.ptoGreen,
     borderRadius: 12,
-    padding: spacing.lg,
+    minWidth: 24,
+    height: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.sm,
+    paddingHorizontal: 8,
+  },
+  notificationBadgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontFamily: typography.bold,
+  },
+  settingRow: {
     marginBottom: spacing.md,
   },
   settingLabel: {
     fontSize: 16,
-    fontWeight: '500',
-    marginBottom: spacing.md,
-    fontFamily: typography.fontFamily,
+    fontFamily: typography.medium,
+    marginBottom: spacing.sm,
   },
-  toggleContainer: {
+  themeButtons: {
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  toggleButton: {
+  themeButton: {
     flex: 1,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+    height: 40,
     borderRadius: 8,
-    alignItems: 'center',
     borderWidth: 1,
-    borderColor: 'transparent',
-  },
-  toggleButtonActive: {
-    borderWidth: 0,
-  },
-  toggleButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    fontFamily: typography.fontFamily,
-  },
-  linkCard: {
-    flexDirection: 'row',
+    justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 12,
-    padding: spacing.lg,
-    marginBottom: spacing.sm,
+  },
+  themeButtonActive: {
+    backgroundColor: colors.ptoGreen,
+    borderColor: colors.ptoGreen,
+  },
+  themeButtonText: {
+    fontSize: 14,
+    fontFamily: typography.medium,
+  },
+  themeButtonTextActive: {
+    color: '#FFFFFF',
+  },
+  linkRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
   },
   linkText: {
-    flex: 1,
     fontSize: 16,
-    fontWeight: '500',
-    marginLeft: spacing.md,
-    fontFamily: typography.fontFamily,
+    fontFamily: typography.regular,
+  },
+  linkDivider: {
+    height: 1,
   },
   logoutButton: {
     borderRadius: 12,
     padding: spacing.lg,
     alignItems: 'center',
-    marginTop: spacing.md,
+    marginBottom: spacing.md,
+    ...commonStyles.cardShadow,
   },
   logoutButtonText: {
-    color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: '700',
-    fontFamily: typography.fontFamily,
+    fontFamily: typography.bold,
+    color: colors.destructive,
+  },
+  versionText: {
+    fontSize: 12,
+    fontFamily: typography.regular,
+    textAlign: 'center',
+    marginBottom: spacing.md,
   },
 });

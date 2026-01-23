@@ -1,25 +1,26 @@
 
 import React, { useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Platform, Linking, Alert, Text, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Platform, Linking, Alert, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
-import { useSupabase } from '@/contexts/SupabaseContext';
 import { colors, typography } from '@/styles/commonStyles';
+import { useRouter } from 'expo-router';
 
 const BASE_URL = 'https://publictimeoff.com';
 
 export default function DashboardScreen() {
   const { effectiveTheme, language } = useTheme();
-  const { user, loading: profileLoading, error, clearError, checkSession } = useSupabase();
   const webViewRef = useRef<WebView>(null);
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
   const [webViewUrl, setWebViewUrl] = useState('');
   const [isWebViewLoading, setIsWebViewLoading] = useState(true);
+  const router = useRouter();
 
   // Build URL with source=app parameter - updates when language changes
   useEffect(() => {
     // Load the participant page directly - the web app will handle authentication
+    // If not authenticated, the web app will redirect to /auth
     const url = `${BASE_URL}/${language}/participant?source=app`;
     console.log('Dashboard screen loaded, loading WebView from:', url, 'Language:', language, 'Theme:', effectiveTheme);
     setWebViewUrl(url);
@@ -33,6 +34,15 @@ export default function DashboardScreen() {
 
     // Update loading state
     setIsWebViewLoading(navState.loading);
+
+    // If the web app redirects to /auth, it means user is not authenticated
+    // Redirect to native auth screen
+    if (url.includes('/auth') && url.includes('source=app')) {
+      console.log('Dashboard: Web app redirected to auth - user not authenticated');
+      console.log('Dashboard: Redirecting to native auth screen');
+      router.replace('/auth');
+      return false;
+    }
 
     // Intercept Instagram URLs and open in Instagram app
     if (url.startsWith('instagram://') || url.includes('instagram.com/share')) {
@@ -100,6 +110,13 @@ export default function DashboardScreen() {
     const url = request.url;
     console.log('Dashboard WebView should start load with request:', url);
 
+    // If the web app redirects to /auth, redirect to native auth screen
+    if (url.includes('/auth') && url.includes('source=app')) {
+      console.log('Dashboard: Intercepting auth redirect');
+      router.replace('/auth');
+      return false;
+    }
+
     // Intercept Instagram URLs
     if (url.startsWith('instagram://') || url.includes('instagram.com/share')) {
       console.log('Intercepting Instagram share request');
@@ -145,32 +162,6 @@ export default function DashboardScreen() {
     // Allow all other requests
     return true;
   };
-
-  // Show error state
-  if (error && !profileLoading) {
-    return (
-      <SafeAreaView
-        style={[styles.container, { backgroundColor: themeColors.background }]}
-        edges={['top']}
-      >
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorTitle}>Error</Text>
-          <Text style={styles.errorMessage}>{error}</Text>
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity 
-              style={[styles.button, styles.retryButton]} 
-              onPress={() => {
-                clearError();
-                checkSession();
-              }}
-            >
-              <Text style={styles.buttonText}>Retry</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </SafeAreaView>
-    );
-  }
 
   if (!webViewUrl) {
     return (
@@ -231,8 +222,7 @@ export default function DashboardScreen() {
           mixedContentMode="compatibility"
           // iOS specific
           allowsBackForwardNavigationGestures={Platform.OS === 'ios'}
-          // Share cookies with auth WebView - this allows the native Supabase client
-          // to detect the session via the onAuthStateChange listener
+          // Share cookies with auth WebView - this allows authentication via web cookies
           sharedCookiesEnabled={true}
           thirdPartyCookiesEnabled={true}
         />
@@ -283,46 +273,6 @@ const styles = StyleSheet.create({
     marginTop: 16,
     fontSize: 16,
     fontFamily: typography.regular,
-    color: '#FFFFFF',
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 24,
-  },
-  errorTitle: {
-    fontSize: 24,
-    fontFamily: typography.bold,
-    color: colors.destructive,
-    marginBottom: 12,
-  },
-  errorMessage: {
-    fontSize: 16,
-    fontFamily: typography.regular,
-    textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 24,
-  },
-  buttonContainer: {
-    flexDirection: 'row',
-    gap: 12,
-    width: '100%',
-    maxWidth: 300,
-  },
-  button: {
-    flex: 1,
-    height: 44,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  retryButton: {
-    backgroundColor: colors.ptoGreen,
-  },
-  buttonText: {
-    fontSize: 16,
-    fontFamily: typography.medium,
     color: '#FFFFFF',
   },
 });
