@@ -52,7 +52,7 @@
 ### 5. App Store Metadata
 Prepare the following for App Store Connect:
 
-- [ ] **App Name:** "PTO Running League" (or your preferred name)
+- [ ] **App Name:** "PTO Corporate Running League" (or your preferred name)
 - [ ] **Subtitle:** (35 characters max)
   - Example: "Corporate Running Competition"
   
