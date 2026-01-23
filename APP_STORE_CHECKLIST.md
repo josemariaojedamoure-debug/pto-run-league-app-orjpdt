@@ -53,8 +53,7 @@
 Prepare the following for App Store Connect:
 
 - [ ] **App Name:** "PTO Corporate Running League" (or your preferred name)
-- [ ] **Subtitle:** (35 characters max)
-  - Example: "Corporate Running Competition"
+- [ ] **Subtitle:** 
   
 - [ ] **Description:** (4000 characters max)
   - Explain the app's purpose
