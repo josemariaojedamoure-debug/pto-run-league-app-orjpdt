@@ -1,12 +1,18 @@
-/**
- * Define your database schema here using Drizzle ORM
- *
- * Example:
- * import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
- *
- * export const users = pgTable('users', {
- *   id: uuid('id').primaryKey().defaultRandom(),
- *   name: text('name').notNull(),
- *   createdAt: timestamp('created_at').notNull().defaultNow(),
- * });
- */
+import { pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import { user } from './auth-schema.js';
+
+export const profiles = pgTable('profiles', {
+  userId: text('user_id')
+    .primaryKey()
+    .references(() => user.id, { onDelete: 'cascade' }),
+  firstName: text('first_name').notNull().default(''),
+  lastName: text('last_name').notNull().default(''),
+  company: text('company').notNull().default(''),
+  createdAt: timestamp('created_at', { withTimezone: true })
+    .defaultNow()
+    .notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true })
+    .defaultNow()
+    .$onUpdate(() => new Date())
+    .notNull(),
+});
