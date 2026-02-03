@@ -40,46 +40,122 @@ export default function AccountScreen() {
 
   console.log('AccountScreen - Theme:', theme, 'Effective:', effectiveTheme, 'Language:', language);
 
-  // Fetch user profile from backend API
+  // Translations
+  const translations = {
+    en: {
+      loading: 'Loading...',
+      notifications: 'Notifications',
+      settings: 'SETTINGS',
+      theme: 'Theme',
+      light: 'Light',
+      dark: 'Dark',
+      system: 'System',
+      language: 'Language',
+      english: 'English',
+      french: 'Français',
+      support: 'SUPPORT',
+      supportLink: 'Support',
+      leagueRules: 'League Rules',
+      privacyPolicy: 'Privacy Policy',
+      signOut: 'Sign Out',
+      signOutTitle: 'Sign Out',
+      signOutMessage: 'Are you sure you want to sign out?',
+      cancel: 'Cancel',
+      version: 'Version',
+    },
+    fr: {
+      loading: 'Chargement...',
+      notifications: 'Notifications',
+      settings: 'PARAMÈTRES',
+      theme: 'Thème',
+      light: 'Clair',
+      dark: 'Sombre',
+      system: 'Système',
+      language: 'Langue',
+      english: 'English',
+      french: 'Français',
+      support: 'ASSISTANCE',
+      supportLink: 'Assistance',
+      leagueRules: 'Règles de la ligue',
+      privacyPolicy: 'Politique de confidentialité',
+      signOut: 'Se déconnecter',
+      signOutTitle: 'Se déconnecter',
+      signOutMessage: 'Êtes-vous sûr de vouloir vous déconnecter?',
+      cancel: 'Annuler',
+      version: 'Version',
+    },
+  };
+
+  const t = translations[language];
+
+  // Fetch user profile from WebView
   useEffect(() => {
     fetchUserProfile();
   }, []);
 
   const fetchUserProfile = async () => {
     try {
-      console.log('AccountScreen: Fetching user profile from backend API');
+      console.log('AccountScreen: Fetching user profile from WebView');
       setIsLoadingProfile(true);
 
-      // TODO: Backend Integration - GET /api/user/profile to fetch { firstName, lastName, company, email, createdAt }
-      // For now, we'll try to get user info from the WebView as fallback
+      // Request user info from the WebView
       const timer = setTimeout(() => {
         if (webViewRef.current) {
-          console.log('AccountScreen: Requesting user info from WebView as fallback');
+          console.log('AccountScreen: Requesting user info from WebView');
           const script = `
             (function() {
               try {
                 // Try to get user info from the web app
                 if (window.ReactNativeWebView) {
-                  // Check if user data is available
-                  const userDataStr = localStorage.getItem('user_data');
+                  // Try multiple possible data sources
+                  let userData = null;
+                  
+                  // Check localStorage for user data
+                  const userDataStr = localStorage.getItem('user_data') || 
+                                     localStorage.getItem('userData') ||
+                                     localStorage.getItem('currentUser');
+                  
                   if (userDataStr) {
-                    const userData = JSON.parse(userDataStr);
+                    userData = JSON.parse(userDataStr);
+                  }
+                  
+                  // If no localStorage data, try to get from window object
+                  if (!userData && window.currentUser) {
+                    userData = window.currentUser;
+                  }
+                  
+                  // If we have user data, send it to native
+                  if (userData) {
                     window.ReactNativeWebView.postMessage(JSON.stringify({
                       type: 'USER_INFO',
                       data: userData
+                    }));
+                  } else {
+                    // No user data found, send empty response
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'USER_INFO',
+                      data: null
                     }));
                   }
                 }
               } catch (e) {
                 console.error('Error getting user info:', e);
+                window.ReactNativeWebView.postMessage(JSON.stringify({
+                  type: 'USER_INFO_ERROR',
+                  error: e.message
+                }));
               }
             })();
             true;
           `;
           webViewRef.current.injectJavaScript(script);
         }
-        setIsLoadingProfile(false);
-      }, 2000);
+        
+        // Set a fallback timeout to stop loading if no response
+        setTimeout(() => {
+          setIsLoadingProfile(false);
+        }, 3000);
+      }, 1000);
 
       return () => clearTimeout(timer);
     } catch (error) {
@@ -127,8 +203,8 @@ export default function AccountScreen() {
             // Clear localStorage
             localStorage.clear();
             
-            // Redirect to logout endpoint
-            window.location.href = '${BASE_URL}/auth/logout?source=app';
+            // Redirect to logout endpoint with language
+            window.location.href = '${BASE_URL}/${language}/auth/logout?source=app';
           } catch (e) {
             console.error('Error during logout:', e);
           }
@@ -147,21 +223,30 @@ export default function AccountScreen() {
       const message = JSON.parse(event.nativeEvent.data);
       console.log('AccountScreen: Received message from WebView:', message.type);
 
-      if (message.type === 'USER_INFO' && message.data) {
-        console.log('AccountScreen: Received user info:', message.data);
-        if (message.data.first_name || message.data.firstName) {
-          setFirstName(message.data.first_name || message.data.firstName);
+      if (message.type === 'USER_INFO') {
+        if (message.data) {
+          console.log('AccountScreen: Received user info:', message.data);
+          
+          // Handle various possible field names
+          const firstName = message.data.first_name || message.data.firstName || message.data.name?.split(' ')[0] || '';
+          const lastName = message.data.last_name || message.data.lastName || message.data.name?.split(' ').slice(1).join(' ') || '';
+          
+          if (firstName) setFirstName(firstName);
+          if (lastName) setLastName(lastName);
+          if (message.data.company) setCompany(message.data.company);
+          if (message.data.email) setUserEmail(message.data.email);
+          
+          if (message.data.created_at || message.data.createdAt || message.data.joinedAt) {
+            const dateStr = message.data.created_at || message.data.createdAt || message.data.joinedAt;
+            const date = new Date(dateStr);
+            setDateJoined(date.toLocaleDateString());
+          }
+        } else {
+          console.log('AccountScreen: No user data received from WebView');
         }
-        if (message.data.last_name || message.data.lastName) {
-          setLastName(message.data.last_name || message.data.lastName);
-        }
-        if (message.data.company) setCompany(message.data.company);
-        if (message.data.email) setUserEmail(message.data.email);
-        if (message.data.created_at || message.data.createdAt) {
-          const dateStr = message.data.created_at || message.data.createdAt;
-          const date = new Date(dateStr);
-          setDateJoined(date.toLocaleDateString());
-        }
+        setIsLoadingProfile(false);
+      } else if (message.type === 'USER_INFO_ERROR') {
+        console.error('AccountScreen: Error from WebView:', message.error);
         setIsLoadingProfile(false);
       }
     } catch (error) {
@@ -210,7 +295,7 @@ export default function AccountScreen() {
                 <ActivityIndicator size="large" color={colors.ptoGreen} />
               </View>
               <Text style={[styles.displayName, { color: themeColors.foreground || themeColors.text, opacity: 0.5 }]}>
-                Loading...
+                {t.loading}
               </Text>
             </React.Fragment>
           ) : (
@@ -256,7 +341,7 @@ export default function AccountScreen() {
               />
             </View>
             <Text style={[styles.menuItemText, { color: themeColors.foreground || themeColors.text }]}>
-              Notifications
+              {t.notifications}
             </Text>
           </View>
           <View style={styles.menuItemRight}>
@@ -278,7 +363,7 @@ export default function AccountScreen() {
 
         {/* Settings Section Header */}
         <Text style={[styles.sectionHeader, { color: themeColors.mutedText }]}>
-          SETTINGS
+          {t.settings}
         </Text>
 
         {/* Theme Setting */}
@@ -294,7 +379,7 @@ export default function AccountScreen() {
                 />
               </View>
               <Text style={[styles.settingLabel, { color: themeColors.foreground || themeColors.text }]}>
-                Theme
+                {t.theme}
               </Text>
             </View>
           </View>
@@ -315,7 +400,7 @@ export default function AccountScreen() {
                   theme === 'light' && styles.optionButtonTextActive,
                 ]}
               >
-                Light
+                {t.light}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -334,7 +419,7 @@ export default function AccountScreen() {
                   theme === 'dark' && styles.optionButtonTextActive,
                 ]}
               >
-                Dark
+                {t.dark}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -353,7 +438,7 @@ export default function AccountScreen() {
                   theme === 'system' && styles.optionButtonTextActive,
                 ]}
               >
-                System
+                {t.system}
               </Text>
             </TouchableOpacity>
           </View>
@@ -372,7 +457,7 @@ export default function AccountScreen() {
                 />
               </View>
               <Text style={[styles.settingLabel, { color: themeColors.foreground || themeColors.text }]}>
-                Language
+                {t.language}
               </Text>
             </View>
           </View>
@@ -393,7 +478,7 @@ export default function AccountScreen() {
                   language === 'en' && styles.optionButtonTextActive,
                 ]}
               >
-                English
+                {t.english}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -412,7 +497,7 @@ export default function AccountScreen() {
                   language === 'fr' && styles.optionButtonTextActive,
                 ]}
               >
-                Français
+                {t.french}
               </Text>
             </TouchableOpacity>
           </View>
@@ -420,18 +505,18 @@ export default function AccountScreen() {
 
         {/* Links Section Header */}
         <Text style={[styles.sectionHeader, { color: themeColors.mutedText }]}>
-          SUPPORT
+          {t.support}
         </Text>
 
         {/* Support Links */}
         <View style={[styles.linksCard, { backgroundColor: themeColors.cardBackground || themeColors.card }]}>
           <TouchableOpacity
             style={styles.linkItem}
-            onPress={() => handleLinkPress(`${BASE_URL}/support`, 'Support')}
+            onPress={() => handleLinkPress(`${BASE_URL}/${language}/support`, t.supportLink)}
             activeOpacity={0.7}
           >
             <Text style={[styles.linkText, { color: themeColors.foreground || themeColors.text }]}>
-              Support
+              {t.supportLink}
             </Text>
             <IconSymbol
               ios_icon_name="chevron.right"
@@ -445,11 +530,11 @@ export default function AccountScreen() {
 
           <TouchableOpacity
             style={styles.linkItem}
-            onPress={() => handleLinkPress(`${BASE_URL}/league-rules`, 'League Rules')}
+            onPress={() => handleLinkPress(`${BASE_URL}/${language}/league-rules`, t.leagueRules)}
             activeOpacity={0.7}
           >
             <Text style={[styles.linkText, { color: themeColors.foreground || themeColors.text }]}>
-              League Rules
+              {t.leagueRules}
             </Text>
             <IconSymbol
               ios_icon_name="chevron.right"
@@ -463,11 +548,11 @@ export default function AccountScreen() {
 
           <TouchableOpacity
             style={styles.linkItem}
-            onPress={() => handleLinkPress(`${BASE_URL}/privacy-policy`, 'Privacy Policy')}
+            onPress={() => handleLinkPress(`${BASE_URL}/${language}/privacy-policy`, t.privacyPolicy)}
             activeOpacity={0.7}
           >
             <Text style={[styles.linkText, { color: themeColors.foreground || themeColors.text }]}>
-              Privacy Policy
+              {t.privacyPolicy}
             </Text>
             <IconSymbol
               ios_icon_name="chevron.right"
@@ -491,13 +576,13 @@ export default function AccountScreen() {
             color={colors.destructive}
           />
           <Text style={[styles.logoutText, { color: colors.destructive }]}>
-            Sign Out
+            {t.signOut}
           </Text>
         </TouchableOpacity>
 
         {/* Version Info */}
         <Text style={[styles.versionText, { color: themeColors.mutedText }]}>
-          Version 1.0.0
+          {t.version} 1.0.0
         </Text>
       </ScrollView>
 
@@ -511,10 +596,10 @@ export default function AccountScreen() {
         <View style={styles.modalOverlay}>
           <View style={[styles.modalContent, { backgroundColor: themeColors.cardBackground || themeColors.card }]}>
             <Text style={[styles.modalTitle, { color: themeColors.foreground || themeColors.text }]}>
-              Sign Out
+              {t.signOutTitle}
             </Text>
             <Text style={[styles.modalMessage, { color: themeColors.mutedText }]}>
-              Are you sure you want to sign out?
+              {t.signOutMessage}
             </Text>
             <View style={styles.modalButtons}>
               <TouchableOpacity
@@ -526,7 +611,7 @@ export default function AccountScreen() {
                 activeOpacity={0.7}
               >
                 <Text style={[styles.modalButtonText, { color: themeColors.foreground || themeColors.text }]}>
-                  Cancel
+                  {t.cancel}
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -535,7 +620,7 @@ export default function AccountScreen() {
                 activeOpacity={0.7}
               >
                 <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
-                  Sign Out
+                  {t.signOut}
                 </Text>
               </TouchableOpacity>
             </View>

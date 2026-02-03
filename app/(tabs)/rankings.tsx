@@ -1,5 +1,5 @@
 
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator, Platform, Linking, Alert, Text } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -14,12 +14,16 @@ export default function RankingsScreen() {
   const webViewRef = useRef<WebView>(null);
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
   const [isWebViewLoading, setIsWebViewLoading] = useState(true);
+  const [webViewUrl, setWebViewUrl] = useState('');
   const router = useRouter();
 
-  // Build URL with source=app parameter
-  const rankingsUrl = `${BASE_URL}/${language}/rankings?source=app`;
-
-  console.log('Rankings screen loaded, loading WebView from:', rankingsUrl, 'Language:', language, 'Theme:', effectiveTheme);
+  // Build URL with source=app parameter - updates when language or theme changes
+  useEffect(() => {
+    const themeParam = effectiveTheme === 'dark' ? 'dark' : 'light';
+    const url = `${BASE_URL}/${language}/rankings?source=app&theme=${themeParam}`;
+    console.log('Rankings screen loaded, loading WebView from:', url, 'Language:', language, 'Theme:', effectiveTheme);
+    setWebViewUrl(url);
+  }, [language, effectiveTheme]);
 
   // Handle navigation state changes to intercept special URLs
   const handleNavigationStateChange = (navState: any) => {
@@ -158,6 +162,22 @@ export default function RankingsScreen() {
     return true;
   };
 
+  if (!webViewUrl) {
+    return (
+      <SafeAreaView
+        style={[styles.container, { backgroundColor: '#FFFFFF' }]}
+        edges={['top']}
+      >
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.ptoGreen} />
+          <Text style={[styles.loadingText, { color: colors.ptoGreen }]}>
+            Loading rankings...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: themeColors.background }]}
@@ -167,7 +187,7 @@ export default function RankingsScreen() {
       <View style={styles.webviewContainer}>
         <WebView
           ref={webViewRef}
-          source={{ uri: rankingsUrl }}
+          source={{ uri: webViewUrl }}
           style={styles.webview}
           startInLoadingState={true}
           renderLoading={() => (
@@ -179,7 +199,7 @@ export default function RankingsScreen() {
             </View>
           )}
           onLoadStart={() => {
-            console.log('Rankings WebView started loading:', rankingsUrl);
+            console.log('Rankings WebView started loading:', webViewUrl);
             setIsWebViewLoading(true);
           }}
           onLoadEnd={() => {

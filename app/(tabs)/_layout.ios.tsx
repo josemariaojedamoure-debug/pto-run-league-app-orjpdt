@@ -1,17 +1,18 @@
 
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, useColorScheme } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Stack, useRouter, usePathname } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, typography, spacing } from '@/styles/commonStyles';
 import { IconSymbol } from '@/components/IconSymbol';
+import { useTheme } from '@/contexts/ThemeContext';
 
 export default function TabLayout() {
   const router = useRouter();
   const pathname = usePathname();
-  const colorScheme = useColorScheme();
+  const { effectiveTheme } = useTheme();
 
-  const themeColors = colorScheme === 'dark' ? colors.dark : colors.light;
+  const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
 
   const tabs = [
     { name: 'Dashboard', route: '/(tabs)/dashboard', iosIcon: 'house.fill', androidIcon: 'home' },
@@ -44,7 +45,7 @@ export default function TabLayout() {
         <View style={[
           styles.tabBar,
           { 
-            backgroundColor: colorScheme === 'dark' ? 'rgba(62, 60, 60, 0.9)' : 'rgba(243, 244, 246, 0.9)',
+            backgroundColor: effectiveTheme === 'dark' ? 'rgba(62, 60, 60, 0.9)' : 'rgba(243, 244, 246, 0.9)',
           },
         ]}>
           {tabs.map((tab) => {

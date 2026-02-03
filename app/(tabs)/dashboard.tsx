@@ -17,12 +17,13 @@ export default function DashboardScreen() {
   const [isWebViewLoading, setIsWebViewLoading] = useState(true);
   const router = useRouter();
 
-  // Build URL with source=app parameter - updates when language changes
+  // Build URL with source=app parameter - updates when language or theme changes
   useEffect(() => {
     // Load the participant page directly - the web app will handle authentication
     // If not authenticated, the web app will redirect to /auth
     // If user is authenticated, the web app will show the participant dashboard
-    const url = `${BASE_URL}/${language}/participant?source=app`;
+    const themeParam = effectiveTheme === 'dark' ? 'dark' : 'light';
+    const url = `${BASE_URL}/${language}/participant?source=app&theme=${themeParam}`;
     console.log('Dashboard screen loaded, loading WebView from:', url, 'Language:', language, 'Theme:', effectiveTheme);
     setWebViewUrl(url);
   }, [language, effectiveTheme]);
