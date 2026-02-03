@@ -166,12 +166,12 @@ export default function RankingsScreen() {
   if (!webViewUrl) {
     return (
       <SafeAreaView
-        style={[styles.container, { backgroundColor: '#FFFFFF' }]}
+        style={[styles.container, { backgroundColor: themeColors.background }]}
         edges={['top']}
       >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.ptoGreen} />
-          <Text style={[styles.loadingText, { color: colors.ptoGreen }]}>
+          <Text style={[styles.loadingText, { color: themeColors.text }]}>
             Loading rankings...
           </Text>
         </View>
@@ -192,9 +192,9 @@ export default function RankingsScreen() {
           style={styles.webview}
           startInLoadingState={true}
           renderLoading={() => (
-            <View style={[styles.loadingContainer, { backgroundColor: '#FFFFFF' }]}>
+            <View style={[styles.loadingContainer, { backgroundColor: themeColors.background }]}>
               <ActivityIndicator size="large" color={colors.ptoGreen} />
-              <Text style={[styles.loadingText, { color: colors.ptoGreen }]}>
+              <Text style={[styles.loadingText, { color: themeColors.text }]}>
                 Loading rankings...
               </Text>
             </View>
@@ -227,11 +227,11 @@ export default function RankingsScreen() {
           thirdPartyCookiesEnabled={true}
         />
         
-        {/* Show white loading screen while WebView is loading (changed from green) */}
+        {/* Show loading screen matching theme while WebView is loading */}
         {isWebViewLoading && (
-          <View style={[styles.loadingOverlay, { backgroundColor: '#FFFFFF' }]}>
+          <View style={[styles.loadingOverlay, { backgroundColor: themeColors.background }]}>
             <ActivityIndicator size="large" color={colors.ptoGreen} />
-            <Text style={[styles.loadingText, { color: colors.ptoGreen }]}>
+            <Text style={[styles.loadingText, { color: themeColors.text }]}>
               Loading rankings...
             </Text>
           </View>

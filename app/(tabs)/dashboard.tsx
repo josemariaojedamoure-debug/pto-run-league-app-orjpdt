@@ -41,7 +41,7 @@ export default function DashboardScreen() {
 
     // If the web app redirects to /auth, it means user is not authenticated
     // Redirect to native auth screen
-    if (url.includes('/auth') && url.includes('source=app')) {
+    if (url.includes('/auth') && !url.includes('participant')) {
       console.log('Dashboard: Web app redirected to auth - user not authenticated');
       console.log('Dashboard: Redirecting to native auth screen');
       router.replace('/auth');
@@ -115,7 +115,7 @@ export default function DashboardScreen() {
     console.log('Dashboard WebView should start load with request:', url);
 
     // If the web app redirects to /auth, redirect to native auth screen
-    if (url.includes('/auth') && url.includes('source=app')) {
+    if (url.includes('/auth') && !url.includes('participant')) {
       console.log('Dashboard: Intercepting auth redirect');
       router.replace('/auth');
       return false;
@@ -170,12 +170,12 @@ export default function DashboardScreen() {
   if (!webViewUrl) {
     return (
       <SafeAreaView
-        style={[styles.container, { backgroundColor: '#FFFFFF' }]}
+        style={[styles.container, { backgroundColor: themeColors.background }]}
         edges={['top']}
       >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.ptoGreen} />
-          <Text style={[styles.loadingText, { color: colors.ptoGreen }]}>
+          <Text style={[styles.loadingText, { color: themeColors.text }]}>
             Loading dashboard...
           </Text>
         </View>
@@ -196,9 +196,9 @@ export default function DashboardScreen() {
           style={styles.webview}
           startInLoadingState={true}
           renderLoading={() => (
-            <View style={[styles.loadingContainer, { backgroundColor: '#FFFFFF' }]}>
+            <View style={[styles.loadingContainer, { backgroundColor: themeColors.background }]}>
               <ActivityIndicator size="large" color={colors.ptoGreen} />
-              <Text style={[styles.loadingText, { color: colors.ptoGreen }]}>
+              <Text style={[styles.loadingText, { color: themeColors.text }]}>
                 Loading dashboard...
               </Text>
             </View>
@@ -231,11 +231,11 @@ export default function DashboardScreen() {
           thirdPartyCookiesEnabled={true}
         />
         
-        {/* Show white loading screen while WebView is loading (changed from green) */}
+        {/* Show loading screen matching theme while WebView is loading */}
         {isWebViewLoading && (
-          <View style={[styles.loadingOverlay, { backgroundColor: '#FFFFFF' }]}>
+          <View style={[styles.loadingOverlay, { backgroundColor: themeColors.background }]}>
             <ActivityIndicator size="large" color={colors.ptoGreen} />
-            <Text style={[styles.loadingText, { color: colors.ptoGreen }]}>
+            <Text style={[styles.loadingText, { color: themeColors.text }]}>
               Loading dashboard...
             </Text>
           </View>

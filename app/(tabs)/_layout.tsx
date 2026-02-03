@@ -136,11 +136,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
-    zIndex: 0,
+    zIndex: 1,
   },
   tabLabel: {
     fontSize: 12,
     fontFamily: 'Helvetica Neue',
-    zIndex: 10,
+    zIndex: 2,
   },
 });

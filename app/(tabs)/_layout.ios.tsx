@@ -151,12 +151,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
-    zIndex: 0,
+    zIndex: 1,
   },
   tabContent: {
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10,
+    zIndex: 2,
   },
   tabLabel: {
     fontSize: 12,
