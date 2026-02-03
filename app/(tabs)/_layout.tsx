@@ -68,7 +68,7 @@ export default function TabLayout() {
                   router.push(tab.route as any);
                 }}
               >
-                {/* White bubble - narrower than the full button width */}
+                {/* White bubble - sits behind text but in front of grey background */}
                 {active && (
                   <View style={styles.whiteBubble} />
                 )}
@@ -136,10 +136,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
+    zIndex: 0,
   },
   tabLabel: {
     fontSize: 12,
     fontFamily: 'Helvetica Neue',
-    zIndex: 1,
+    zIndex: 10,
   },
 });
