@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Platform, Linking, Alert, Text } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Platform, Linking, Alert, Text, Share } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -30,7 +30,7 @@ export default function DashboardScreen() {
     setWebViewUrl(url);
   }, [language, effectiveTheme]);
 
-  // Inject JavaScript to force theme in WebView
+  // Inject JavaScript to force theme in WebView and set up message handlers
   const injectedJavaScript = `
     (function() {
       // Set theme in localStorage to override any saved preference
@@ -48,9 +48,104 @@ export default function DashboardScreen() {
       } catch (error) {
         console.error('[Native App] Error setting theme:', error);
       }
+
+      // Intercept share actions from the web app
+      if (window.navigator && window.navigator.share) {
+        const originalShare = window.navigator.share;
+        window.navigator.share = function(shareData) {
+          console.log('[Native App] Intercepted share action:', shareData);
+          
+          // Send share data to native app
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'SHARE_REQUEST',
+              data: shareData
+            }));
+          }
+          
+          // Return a resolved promise to prevent web app from showing error
+          return Promise.resolve();
+        };
+      }
+
+      // Send user info to native app if available
+      try {
+        const userDataStr = localStorage.getItem('user_data') || 
+                           localStorage.getItem('userData') ||
+                           localStorage.getItem('currentUser');
+        
+        if (userDataStr && window.ReactNativeWebView) {
+          const userData = JSON.parse(userDataStr);
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'USER_INFO',
+            data: userData
+          }));
+        }
+      } catch (e) {
+        console.error('[Native App] Error sending user info:', e);
+      }
     })();
     true;
   `;
+
+  // Handle messages from WebView
+  const handleWebViewMessage = (event: any) => {
+    try {
+      const message = JSON.parse(event.nativeEvent.data);
+      console.log('Dashboard: Received message from WebView:', message.type);
+
+      if (message.type === 'SHARE_REQUEST') {
+        console.log('Dashboard: Share request received:', message.data);
+        handleShare(message.data);
+      } else if (message.type === 'USER_INFO') {
+        console.log('Dashboard: User info received:', message.data);
+        // Store user info globally or in context if needed
+      }
+    } catch (error) {
+      console.error('Dashboard: Error handling WebView message:', error);
+    }
+  };
+
+  // Handle share action
+  const handleShare = async (shareData: any) => {
+    try {
+      console.log('Dashboard: Handling share with data:', shareData);
+      
+      // Check if this is an Instagram share request
+      const isInstagramShare = shareData.url?.includes('instagram') || 
+                               shareData.text?.toLowerCase().includes('instagram');
+      
+      if (isInstagramShare) {
+        console.log('Dashboard: Instagram share detected, opening Instagram app');
+        
+        // Try to open Instagram app
+        const instagramUrl = 'instagram://share';
+        const canOpen = await Linking.canOpenURL(instagramUrl);
+        
+        if (canOpen) {
+          console.log('Dashboard: Opening Instagram app');
+          await Linking.openURL(instagramUrl);
+        } else {
+          console.log('Dashboard: Instagram app not installed, opening app store');
+          const fallbackUrl = Platform.OS === 'ios' 
+            ? 'https://apps.apple.com/app/instagram/id389801252'
+            : 'https://play.google.com/store/apps/details?id=com.instagram.android';
+          await Linking.openURL(fallbackUrl);
+        }
+      } else {
+        // Use native share sheet for other shares
+        console.log('Dashboard: Using native share sheet');
+        await Share.share({
+          message: shareData.text || shareData.title || '',
+          url: shareData.url || '',
+          title: shareData.title || '',
+        });
+      }
+    } catch (error) {
+      console.error('Dashboard: Error sharing:', error);
+      Alert.alert('Error', 'Could not share content. Please try again.');
+    }
+  };
 
   // Handle navigation state changes to intercept special URLs
   const handleNavigationStateChange = (navState: any) => {
@@ -219,6 +314,7 @@ export default function DashboardScreen() {
           startInLoadingState={true}
           injectedJavaScript={injectedJavaScript}
           injectedJavaScriptBeforeContentLoaded={injectedJavaScript}
+          onMessage={handleWebViewMessage}
           renderLoading={() => (
             <View style={[styles.loadingContainer, { backgroundColor: themeColors.background }]}>
               <ActivityIndicator size="large" color={colors.ptoGreen} />

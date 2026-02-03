@@ -1,6 +1,6 @@
 
 import React, { useRef, useState, useEffect } from 'react';
-import { View, StyleSheet, ActivityIndicator, Platform, Linking, Alert, Text } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Platform, Linking, Alert, Text, Share } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -26,7 +26,7 @@ export default function RankingsScreen() {
     setWebViewUrl(url);
   }, [language, effectiveTheme]);
 
-  // Inject JavaScript to force theme in WebView
+  // Inject JavaScript to force theme in WebView and set up message handlers
   const injectedJavaScript = `
     (function() {
       // Set theme in localStorage to override any saved preference
@@ -44,9 +44,84 @@ export default function RankingsScreen() {
       } catch (error) {
         console.error('[Native App] Error setting theme:', error);
       }
+
+      // Intercept share actions from the web app
+      if (window.navigator && window.navigator.share) {
+        const originalShare = window.navigator.share;
+        window.navigator.share = function(shareData) {
+          console.log('[Native App] Intercepted share action:', shareData);
+          
+          // Send share data to native app
+          if (window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'SHARE_REQUEST',
+              data: shareData
+            }));
+          }
+          
+          // Return a resolved promise to prevent web app from showing error
+          return Promise.resolve();
+        };
+      }
     })();
     true;
   `;
+
+  // Handle messages from WebView
+  const handleWebViewMessage = (event: any) => {
+    try {
+      const message = JSON.parse(event.nativeEvent.data);
+      console.log('Rankings: Received message from WebView:', message.type);
+
+      if (message.type === 'SHARE_REQUEST') {
+        console.log('Rankings: Share request received:', message.data);
+        handleShare(message.data);
+      }
+    } catch (error) {
+      console.error('Rankings: Error handling WebView message:', error);
+    }
+  };
+
+  // Handle share action
+  const handleShare = async (shareData: any) => {
+    try {
+      console.log('Rankings: Handling share with data:', shareData);
+      
+      // Check if this is an Instagram share request
+      const isInstagramShare = shareData.url?.includes('instagram') || 
+                               shareData.text?.toLowerCase().includes('instagram');
+      
+      if (isInstagramShare) {
+        console.log('Rankings: Instagram share detected, opening Instagram app');
+        
+        // Try to open Instagram app
+        const instagramUrl = 'instagram://share';
+        const canOpen = await Linking.canOpenURL(instagramUrl);
+        
+        if (canOpen) {
+          console.log('Rankings: Opening Instagram app');
+          await Linking.openURL(instagramUrl);
+        } else {
+          console.log('Rankings: Instagram app not installed, opening app store');
+          const fallbackUrl = Platform.OS === 'ios' 
+            ? 'https://apps.apple.com/app/instagram/id389801252'
+            : 'https://play.google.com/store/apps/details?id=com.instagram.android';
+          await Linking.openURL(fallbackUrl);
+        }
+      } else {
+        // Use native share sheet for other shares
+        console.log('Rankings: Using native share sheet');
+        await Share.share({
+          message: shareData.text || shareData.title || '',
+          url: shareData.url || '',
+          title: shareData.title || '',
+        });
+      }
+    } catch (error) {
+      console.error('Rankings: Error sharing:', error);
+      Alert.alert('Error', 'Could not share content. Please try again.');
+    }
+  };
 
   // Handle navigation state changes to intercept special URLs
   const handleNavigationStateChange = (navState: any) => {
@@ -215,6 +290,7 @@ export default function RankingsScreen() {
           startInLoadingState={true}
           injectedJavaScript={injectedJavaScript}
           injectedJavaScriptBeforeContentLoaded={injectedJavaScript}
+          onMessage={handleWebViewMessage}
           renderLoading={() => (
             <View style={[styles.loadingContainer, { backgroundColor: themeColors.background }]}>
               <ActivityIndicator size="large" color={colors.ptoGreen} />

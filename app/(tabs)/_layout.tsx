@@ -68,7 +68,7 @@ export default function TabLayout() {
                   router.push(tab.route as any);
                 }}
               >
-                {/* Theme-aware bubble - white in light mode, dark card color in dark mode */}
+                {/* Theme-aware bubble - positioned BEHIND text but IN FRONT of tab bar */}
                 {active && (
                   <View style={[
                     styles.activeBubble,
@@ -140,11 +140,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
-    zIndex: 1,
+    // Remove zIndex - let natural stacking order work
+    // The bubble is rendered BEFORE the text, so it will be behind
   },
   tabLabel: {
     fontSize: 12,
     fontFamily: 'Helvetica Neue',
-    zIndex: 2,
+    // Remove zIndex - let natural stacking order work
+    // The text is rendered AFTER the bubble, so it will be in front
   },
 });

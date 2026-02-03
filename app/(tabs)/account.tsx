@@ -88,74 +88,72 @@ export default function AccountScreen() {
 
   // Fetch user profile from WebView
   useEffect(() => {
-    fetchUserProfile();
+    // Wait for WebView to load before requesting user info
+    const timer = setTimeout(() => {
+      fetchUserProfile();
+    }, 2000); // Give WebView time to load
+
+    return () => clearTimeout(timer);
   }, []);
 
-  const fetchUserProfile = async () => {
+  const fetchUserProfile = () => {
     try {
-      console.log('AccountScreen: Fetching user profile from WebView');
-      setIsLoadingProfile(true);
-
-      // Request user info from the WebView
-      const timer = setTimeout(() => {
-        if (webViewRef.current) {
-          console.log('AccountScreen: Requesting user info from WebView');
-          const script = `
-            (function() {
-              try {
-                // Try to get user info from the web app
-                if (window.ReactNativeWebView) {
-                  // Try multiple possible data sources
-                  let userData = null;
-                  
-                  // Check localStorage for user data
-                  const userDataStr = localStorage.getItem('user_data') || 
-                                     localStorage.getItem('userData') ||
-                                     localStorage.getItem('currentUser');
-                  
-                  if (userDataStr) {
-                    userData = JSON.parse(userDataStr);
-                  }
-                  
-                  // If no localStorage data, try to get from window object
-                  if (!userData && window.currentUser) {
-                    userData = window.currentUser;
-                  }
-                  
-                  // If we have user data, send it to native
-                  if (userData) {
-                    window.ReactNativeWebView.postMessage(JSON.stringify({
-                      type: 'USER_INFO',
-                      data: userData
-                    }));
-                  } else {
-                    // No user data found, send empty response
-                    window.ReactNativeWebView.postMessage(JSON.stringify({
-                      type: 'USER_INFO',
-                      data: null
-                    }));
-                  }
+      console.log('AccountScreen: Requesting user info from WebView');
+      
+      if (webViewRef.current) {
+        const script = `
+          (function() {
+            try {
+              // Try to get user info from the web app
+              if (window.ReactNativeWebView) {
+                // Try multiple possible data sources
+                let userData = null;
+                
+                // Check localStorage for user data
+                const userDataStr = localStorage.getItem('user_data') || 
+                                   localStorage.getItem('userData') ||
+                                   localStorage.getItem('currentUser');
+                
+                if (userDataStr) {
+                  userData = JSON.parse(userDataStr);
                 }
-              } catch (e) {
-                console.error('Error getting user info:', e);
-                window.ReactNativeWebView.postMessage(JSON.stringify({
-                  type: 'USER_INFO_ERROR',
-                  error: e.message
-                }));
+                
+                // If no localStorage data, try to get from window object
+                if (!userData && window.currentUser) {
+                  userData = window.currentUser;
+                }
+                
+                // If we have user data, send it to native
+                if (userData) {
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'USER_INFO',
+                    data: userData
+                  }));
+                } else {
+                  // No user data found, send empty response
+                  window.ReactNativeWebView.postMessage(JSON.stringify({
+                    type: 'USER_INFO',
+                    data: null
+                  }));
+                }
               }
-            })();
-            true;
-          `;
-          webViewRef.current.injectJavaScript(script);
-        }
-        
-        // Set a fallback timeout to stop loading if no response
-        setTimeout(() => {
-          setIsLoadingProfile(false);
-        }, 3000);
-      }, 1000);
-
-      return () => clearTimeout(timer);
+            } catch (e) {
+              console.error('Error getting user info:', e);
+              window.ReactNativeWebView.postMessage(JSON.stringify({
+                type: 'USER_INFO_ERROR',
+                error: e.message
+              }));
+            }
+          })();
+          true;
+        `;
+        webViewRef.current.injectJavaScript(script);
+      }
+      
+      // Set a fallback timeout to stop loading if no response
+      setTimeout(() => {
+        setIsLoadingProfile(false);
+      }, 5000);
     } catch (error) {
       console.error('AccountScreen: Error fetching user profile:', error);
       setIsLoadingProfile(false);
@@ -226,18 +224,38 @@ export default function AccountScreen() {
           console.log('AccountScreen: Received user info:', message.data);
           
           // Handle various possible field names
-          const firstName = message.data.first_name || message.data.firstName || message.data.name?.split(' ')[0] || '';
-          const lastName = message.data.last_name || message.data.lastName || message.data.name?.split(' ').slice(1).join(' ') || '';
+          const userFirstName = message.data.first_name || 
+                                message.data.firstName || 
+                                message.data.name?.split(' ')[0] || 
+                                '';
+          const userLastName = message.data.last_name || 
+                               message.data.lastName || 
+                               message.data.name?.split(' ').slice(1).join(' ') || 
+                               '';
           
-          if (firstName) setFirstName(firstName);
-          if (lastName) setLastName(lastName);
-          if (message.data.company) setCompany(message.data.company);
-          if (message.data.email) setUserEmail(message.data.email);
+          if (userFirstName) {
+            console.log('AccountScreen: Setting first name:', userFirstName);
+            setFirstName(userFirstName);
+          }
+          if (userLastName) {
+            console.log('AccountScreen: Setting last name:', userLastName);
+            setLastName(userLastName);
+          }
+          if (message.data.company) {
+            console.log('AccountScreen: Setting company:', message.data.company);
+            setCompany(message.data.company);
+          }
+          if (message.data.email) {
+            console.log('AccountScreen: Setting email:', message.data.email);
+            setUserEmail(message.data.email);
+          }
           
           if (message.data.created_at || message.data.createdAt || message.data.joinedAt) {
             const dateStr = message.data.created_at || message.data.createdAt || message.data.joinedAt;
             const date = new Date(dateStr);
-            setDateJoined(date.toLocaleDateString());
+            const formattedDate = date.toLocaleDateString();
+            console.log('AccountScreen: Setting date joined:', formattedDate);
+            setDateJoined(formattedDate);
           }
         } else {
           console.log('AccountScreen: No user data received from WebView');
@@ -273,6 +291,13 @@ export default function AccountScreen() {
           ref={webViewRef}
           source={{ uri: `${BASE_URL}/${language}/participant?source=app` }}
           onMessage={handleWebViewMessage}
+          onLoadEnd={() => {
+            console.log('AccountScreen: Hidden WebView loaded, requesting user info');
+            // Request user info after WebView loads
+            setTimeout(() => {
+              fetchUserProfile();
+            }, 1000);
+          }}
           sharedCookiesEnabled={true}
           thirdPartyCookiesEnabled={true}
           javaScriptEnabled={true}

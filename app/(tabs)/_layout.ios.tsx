@@ -75,7 +75,7 @@ export default function TabLayout() {
                   router.push(tab.route as any);
                 }}
               >
-                {/* Theme-aware bubble - white in light mode, dark card color in dark mode */}
+                {/* Theme-aware bubble - positioned BEHIND content but IN FRONT of tab bar */}
                 {active && (
                   <View style={[
                     styles.activeBubble,
@@ -155,12 +155,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
-    zIndex: 1,
+    // Remove zIndex - let natural stacking order work
+    // The bubble is rendered BEFORE the content, so it will be behind
   },
   tabContent: {
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 2,
+    // Remove zIndex - let natural stacking order work
+    // The content is rendered AFTER the bubble, so it will be in front
   },
   tabLabel: {
     fontSize: 12,
