@@ -26,6 +26,28 @@ export default function RankingsScreen() {
     setWebViewUrl(url);
   }, [language, effectiveTheme]);
 
+  // Inject JavaScript to force theme in WebView
+  const injectedJavaScript = `
+    (function() {
+      // Set theme in localStorage to override any saved preference
+      try {
+        localStorage.setItem('theme', '${effectiveTheme}');
+        console.log('[Native App] Set theme to ${effectiveTheme} in localStorage');
+        
+        // Dispatch custom event for web app to listen to
+        window.dispatchEvent(new CustomEvent('appThemeChanged', { detail: '${effectiveTheme}' }));
+        console.log('[Native App] Dispatched appThemeChanged event');
+        
+        // Force apply theme by adding data attribute to html element
+        document.documentElement.setAttribute('data-theme', '${effectiveTheme}');
+        console.log('[Native App] Set data-theme attribute to ${effectiveTheme}');
+      } catch (error) {
+        console.error('[Native App] Error setting theme:', error);
+      }
+    })();
+    true;
+  `;
+
   // Handle navigation state changes to intercept special URLs
   const handleNavigationStateChange = (navState: any) => {
     console.log('Rankings WebView navigation:', navState.url);
@@ -171,7 +193,7 @@ export default function RankingsScreen() {
       >
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.ptoGreen} />
-          <Text style={[styles.loadingText, { color: themeColors.text }]}>
+          <Text style={[styles.loadingText, { color: themeColors.foreground }]}>
             Loading rankings...
           </Text>
         </View>
@@ -191,10 +213,12 @@ export default function RankingsScreen() {
           source={{ uri: webViewUrl }}
           style={styles.webview}
           startInLoadingState={true}
+          injectedJavaScript={injectedJavaScript}
+          injectedJavaScriptBeforeContentLoaded={injectedJavaScript}
           renderLoading={() => (
             <View style={[styles.loadingContainer, { backgroundColor: themeColors.background }]}>
               <ActivityIndicator size="large" color={colors.ptoGreen} />
-              <Text style={[styles.loadingText, { color: themeColors.text }]}>
+              <Text style={[styles.loadingText, { color: themeColors.foreground }]}>
                 Loading rankings...
               </Text>
             </View>
@@ -206,6 +230,11 @@ export default function RankingsScreen() {
           onLoadEnd={() => {
             console.log('Rankings WebView finished loading');
             setIsWebViewLoading(false);
+            
+            // Re-inject theme after page load to ensure it's applied
+            if (webViewRef.current) {
+              webViewRef.current.injectJavaScript(injectedJavaScript);
+            }
           }}
           onError={(syntheticEvent) => {
             const { nativeEvent } = syntheticEvent;
@@ -231,7 +260,7 @@ export default function RankingsScreen() {
         {isWebViewLoading && (
           <View style={[styles.loadingOverlay, { backgroundColor: themeColors.background }]}>
             <ActivityIndicator size="large" color={colors.ptoGreen} />
-            <Text style={[styles.loadingText, { color: themeColors.text }]}>
+            <Text style={[styles.loadingText, { color: themeColors.foreground }]}>
               Loading rankings...
             </Text>
           </View>

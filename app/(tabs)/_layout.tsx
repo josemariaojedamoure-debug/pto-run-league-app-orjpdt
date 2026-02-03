@@ -46,7 +46,7 @@ export default function TabLayout() {
         <Stack.Screen name="account" />
       </Stack>
 
-      {/* Custom Bottom Tab Bar - Transparent with Grey Background and White Bubble */}
+      {/* Custom Bottom Tab Bar - Transparent with Grey Background and Theme-Aware Bubble */}
       <SafeAreaView
         edges={['bottom']}
         style={styles.tabBarContainer}
@@ -68,9 +68,14 @@ export default function TabLayout() {
                   router.push(tab.route as any);
                 }}
               >
-                {/* White bubble - sits behind text but in front of grey background */}
+                {/* Theme-aware bubble - white in light mode, dark card color in dark mode */}
                 {active && (
-                  <View style={styles.whiteBubble} />
+                  <View style={[
+                    styles.activeBubble,
+                    {
+                      backgroundColor: effectiveTheme === 'dark' ? colors.dark.card : '#FFFFFF',
+                    }
+                  ]} />
                 )}
                 <Text
                   style={[
@@ -123,13 +128,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     position: 'relative',
   },
-  whiteBubble: {
+  activeBubble: {
     position: 'absolute',
     top: 4,
     bottom: 4,
     left: 8,
     right: 8,
-    backgroundColor: '#FFFFFF',
     borderRadius: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
