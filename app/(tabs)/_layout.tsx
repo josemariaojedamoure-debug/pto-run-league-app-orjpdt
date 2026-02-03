@@ -44,7 +44,7 @@ export default function TabLayout() {
         <View style={[
           styles.tabBar,
           { 
-            backgroundColor: effectiveTheme === 'dark' ? 'rgba(62, 60, 60, 0.9)' : 'rgba(243, 244, 246, 0.9)',
+            backgroundColor: effectiveTheme === 'dark' ? 'rgba(62, 60, 60, 0.95)' : 'rgba(243, 244, 246, 0.95)',
           },
         ]}>
           {tabs.map((tab) => {
@@ -85,9 +85,14 @@ export default function TabLayout() {
 
 const styles = StyleSheet.create({
   tabBarContainer: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
     paddingHorizontal: 16,
     paddingBottom: 8,
     backgroundColor: 'transparent',
+    pointerEvents: 'box-none',
   },
   tabBar: {
     flexDirection: 'row',
@@ -95,6 +100,11 @@ const styles = StyleSheet.create({
     borderRadius: 28,
     padding: 4,
     gap: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
   },
   tabButton: {
     flex: 1,
@@ -108,9 +118,9 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   tabLabel: {
     fontSize: 12,

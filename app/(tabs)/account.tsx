@@ -49,7 +49,6 @@ export default function AccountScreen() {
       theme: 'Theme',
       light: 'Light',
       dark: 'Dark',
-      system: 'System',
       language: 'Language',
       english: 'English',
       french: 'Français',
@@ -70,7 +69,6 @@ export default function AccountScreen() {
       theme: 'Thème',
       light: 'Clair',
       dark: 'Sombre',
-      system: 'Système',
       language: 'Langue',
       english: 'English',
       french: 'Français',
@@ -164,7 +162,7 @@ export default function AccountScreen() {
     }
   };
 
-  const handleThemeChange = (mode: 'light' | 'dark' | 'system') => {
+  const handleThemeChange = (mode: 'light' | 'dark') => {
     console.log('User changed theme to:', mode);
     setTheme(mode);
   };
@@ -366,7 +364,7 @@ export default function AccountScreen() {
           {t.settings}
         </Text>
 
-        {/* Theme Setting */}
+        {/* Theme Setting - Only Light and Dark options */}
         <View style={[styles.settingCard, { backgroundColor: themeColors.cardBackground || themeColors.card }]}>
           <View style={styles.settingHeader}>
             <View style={styles.settingHeaderLeft}>
@@ -420,25 +418,6 @@ export default function AccountScreen() {
                 ]}
               >
                 {t.dark}
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                styles.optionButton,
-                { borderColor: themeColors.border },
-                theme === 'system' && [styles.optionButtonActive, { backgroundColor: colors.ptoGreen }],
-              ]}
-              onPress={() => handleThemeChange('system')}
-              activeOpacity={0.7}
-            >
-              <Text
-                style={[
-                  styles.optionButtonText,
-                  { color: themeColors.foreground || themeColors.text },
-                  theme === 'system' && styles.optionButtonTextActive,
-                ]}
-              >
-                {t.system}
               </Text>
             </TouchableOpacity>
           </View>
