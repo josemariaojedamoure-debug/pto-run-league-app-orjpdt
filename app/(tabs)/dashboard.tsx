@@ -22,8 +22,10 @@ export default function DashboardScreen() {
     // Load the participant page directly - the web app will handle authentication
     // If not authenticated, the web app will redirect to /auth
     // If user is authenticated, the web app will show the participant dashboard
-    const themeParam = effectiveTheme === 'dark' ? 'dark' : 'light';
-    const url = `${BASE_URL}/${language}/participant?source=app&theme=${themeParam}`;
+    
+    // Theme parameter: only add &theme=dark for dark mode, light mode has no parameter (default)
+    const themeParam = effectiveTheme === 'dark' ? '&theme=dark' : '';
+    const url = `${BASE_URL}/${language}/participant?source=app${themeParam}`;
     console.log('Dashboard screen loaded, loading WebView from:', url, 'Language:', language, 'Theme:', effectiveTheme);
     setWebViewUrl(url);
   }, [language, effectiveTheme]);

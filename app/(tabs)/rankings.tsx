@@ -19,8 +19,9 @@ export default function RankingsScreen() {
 
   // Build URL with source=app parameter - updates when language or theme changes
   useEffect(() => {
-    const themeParam = effectiveTheme === 'dark' ? 'dark' : 'light';
-    const url = `${BASE_URL}/${language}/rankings?source=app&theme=${themeParam}`;
+    // Theme parameter: only add &theme=dark for dark mode, light mode has no parameter (default)
+    const themeParam = effectiveTheme === 'dark' ? '&theme=dark' : '';
+    const url = `${BASE_URL}/${language}/rankings?source=app${themeParam}`;
     console.log('Rankings screen loaded, loading WebView from:', url, 'Language:', language, 'Theme:', effectiveTheme);
     setWebViewUrl(url);
   }, [language, effectiveTheme]);
