@@ -15,6 +15,7 @@ export const colors = {
     mutedText: '#6B7280',
     border: '#DEE1E6',
     card: '#FFFFFF',
+    cardBackground: '#FFFFFF',
     destructive: '#EF4444',
     tabBarBackground: '#F3F4F6',
     tabBarActive: '#40A060',
@@ -28,7 +29,9 @@ export const colors = {
     secondaryText: '#E4E2DD',
     cardBodyText: '#CFCBC1',
     card: '#343232',
+    cardBackground: '#343232',
     mutedBackground: '#3E3C3C',
+    mutedText: '#6B7280',
     border: '#444242',
     destructive: '#814545',
     tabBarBackground: '#3E3C3C',
@@ -40,6 +43,9 @@ export const colors = {
 export const typography = {
   fontFamily: 'Helvetica Neue',
   fontFamilyDisplay: 'Swissposters', // For hero sections only
+  regular: 'Helvetica Neue',
+  medium: 'Helvetica Neue',
+  bold: 'Helvetica Neue',
   weights: {
     regular: '400' as const,
     medium: '500' as const,
@@ -57,6 +63,11 @@ export const typography = {
 };
 
 export const spacing = {
+  xs: 4,
+  sm: 8,
+  md: 16,
+  lg: 24,
+  xl: 32,
   buttonHeight: 40,
   inputHeight: 40,
   borderRadius: 12,
@@ -93,6 +104,13 @@ export const commonStyles = StyleSheet.create({
   card: {
     borderRadius: spacing.borderRadius,
     padding: spacing.cardPadding,
+  },
+  cardShadow: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   text: {
     fontSize: typography.sizes.body,

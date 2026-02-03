@@ -21,6 +21,7 @@ export default function DashboardScreen() {
   useEffect(() => {
     // Load the participant page directly - the web app will handle authentication
     // If not authenticated, the web app will redirect to /auth
+    // If user is authenticated, the web app will show the participant dashboard
     const url = `${BASE_URL}/${language}/participant?source=app`;
     console.log('Dashboard screen loaded, loading WebView from:', url, 'Language:', language, 'Theme:', effectiveTheme);
     setWebViewUrl(url);
@@ -166,12 +167,12 @@ export default function DashboardScreen() {
   if (!webViewUrl) {
     return (
       <SafeAreaView
-        style={[styles.container, { backgroundColor: colors.ptoGreen }]}
+        style={[styles.container, { backgroundColor: '#FFFFFF' }]}
         edges={['top']}
       >
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FFFFFF" />
-          <Text style={styles.loadingTextWhite}>
+          <ActivityIndicator size="large" color={colors.ptoGreen} />
+          <Text style={[styles.loadingText, { color: colors.ptoGreen }]}>
             Loading dashboard...
           </Text>
         </View>
@@ -192,9 +193,9 @@ export default function DashboardScreen() {
           style={styles.webview}
           startInLoadingState={true}
           renderLoading={() => (
-            <View style={[styles.loadingContainer, { backgroundColor: colors.ptoGreen }]}>
-              <ActivityIndicator size="large" color="#FFFFFF" />
-              <Text style={styles.loadingTextWhite}>
+            <View style={[styles.loadingContainer, { backgroundColor: '#FFFFFF' }]}>
+              <ActivityIndicator size="large" color={colors.ptoGreen} />
+              <Text style={[styles.loadingText, { color: colors.ptoGreen }]}>
                 Loading dashboard...
               </Text>
             </View>
@@ -227,11 +228,11 @@ export default function DashboardScreen() {
           thirdPartyCookiesEnabled={true}
         />
         
-        {/* Show native green loading screen while WebView is loading */}
+        {/* Show white loading screen while WebView is loading (changed from green) */}
         {isWebViewLoading && (
-          <View style={[styles.loadingOverlay, { backgroundColor: colors.ptoGreen }]}>
-            <ActivityIndicator size="large" color="#FFFFFF" />
-            <Text style={styles.loadingTextWhite}>
+          <View style={[styles.loadingOverlay, { backgroundColor: '#FFFFFF' }]}>
+            <ActivityIndicator size="large" color={colors.ptoGreen} />
+            <Text style={[styles.loadingText, { color: colors.ptoGreen }]}>
               Loading dashboard...
             </Text>
           </View>
@@ -269,10 +270,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingTextWhite: {
+  loadingText: {
     marginTop: 16,
     fontSize: 16,
     fontFamily: typography.regular,
-    color: '#FFFFFF',
   },
 });

@@ -146,7 +146,7 @@
         }
       ]
     ],
-    "scheme": "pto-run-league",
+    "scheme": "PTO",
     "experiments": {
       "typedRoutes": true
     },

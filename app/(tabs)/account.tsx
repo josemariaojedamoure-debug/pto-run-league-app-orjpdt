@@ -6,15 +6,16 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
+  Modal,
   Platform,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { IconSymbol } from '@/components/IconSymbol';
 import { useNotifications } from '@/contexts/NotificationContext';
 import { useTheme } from '@/contexts/ThemeContext';
-import { colors, typography, spacing, commonStyles } from '@/styles/commonStyles';
+import { colors, typography, spacing } from '@/styles/commonStyles';
 import * as WebBrowser from 'expo-web-browser';
 import { WebView } from 'react-native-webview';
 
@@ -25,47 +26,69 @@ export default function AccountScreen() {
   const { theme, setTheme, language, setLanguage, effectiveTheme } = useTheme();
   const router = useRouter();
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
-  const [userName, setUserName] = useState('User');
+  
+  // User profile state
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [company, setCompany] = useState('');
   const [userEmail, setUserEmail] = useState('');
   const [dateJoined, setDateJoined] = useState('');
+  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   const webViewRef = useRef<WebView>(null);
 
-  console.log('AccountScreen - Theme:', effectiveTheme, 'Language:', language);
+  console.log('AccountScreen - Theme:', theme, 'Effective:', effectiveTheme, 'Language:', language);
 
-  // Request user info from WebView on mount
+  // Fetch user profile from backend API
   useEffect(() => {
-    const timer = setTimeout(() => {
-      if (webViewRef.current) {
-        console.log('AccountScreen: Requesting user info from WebView');
-        const script = `
-          (function() {
-            try {
-              // Try to get user info from the web app
-              if (window.ReactNativeWebView) {
-                // Check if user data is available
-                const userDataStr = localStorage.getItem('user_data');
-                if (userDataStr) {
-                  const userData = JSON.parse(userDataStr);
-                  window.ReactNativeWebView.postMessage(JSON.stringify({
-                    type: 'USER_INFO',
-                    data: userData
-                  }));
-                }
-              }
-            } catch (e) {
-              console.error('Error getting user info:', e);
-            }
-          })();
-          true;
-        `;
-        webViewRef.current.injectJavaScript(script);
-      }
-    }, 1000);
-
-    return () => clearTimeout(timer);
+    fetchUserProfile();
   }, []);
 
-  const handleThemeChange = (mode: 'light' | 'dark') => {
+  const fetchUserProfile = async () => {
+    try {
+      console.log('AccountScreen: Fetching user profile from backend API');
+      setIsLoadingProfile(true);
+
+      // TODO: Backend Integration - GET /api/user/profile to fetch { firstName, lastName, company, email, createdAt }
+      // For now, we'll try to get user info from the WebView as fallback
+      const timer = setTimeout(() => {
+        if (webViewRef.current) {
+          console.log('AccountScreen: Requesting user info from WebView as fallback');
+          const script = `
+            (function() {
+              try {
+                // Try to get user info from the web app
+                if (window.ReactNativeWebView) {
+                  // Check if user data is available
+                  const userDataStr = localStorage.getItem('user_data');
+                  if (userDataStr) {
+                    const userData = JSON.parse(userDataStr);
+                    window.ReactNativeWebView.postMessage(JSON.stringify({
+                      type: 'USER_INFO',
+                      data: userData
+                    }));
+                  }
+                }
+              } catch (e) {
+                console.error('Error getting user info:', e);
+              }
+            })();
+            true;
+          `;
+          webViewRef.current.injectJavaScript(script);
+        }
+        setIsLoadingProfile(false);
+      }, 2000);
+
+      return () => clearTimeout(timer);
+    } catch (error) {
+      console.error('AccountScreen: Error fetching user profile:', error);
+      setIsLoadingProfile(false);
+    }
+  };
+
+  const handleThemeChange = (mode: 'light' | 'dark' | 'system') => {
     console.log('User changed theme to:', mode);
     setTheme(mode);
   };
@@ -84,52 +107,39 @@ export default function AccountScreen() {
       });
     } catch (error) {
       console.error('Error opening browser:', error);
-      Alert.alert('Error', 'Could not open link');
     }
   };
 
   const handleLogout = () => {
     console.log('User tapped logout button');
-    Alert.alert(
-      'Sign Out',
-      'Are you sure you want to sign out?',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-          onPress: () => console.log('User cancelled logout'),
-        },
-        {
-          text: 'Sign Out',
-          style: 'destructive',
-          onPress: async () => {
-            console.log('User confirmed logout, signing out');
+    setShowLogoutModal(true);
+  };
+
+  const confirmLogout = async () => {
+    console.log('User confirmed logout, signing out');
+    setShowLogoutModal(false);
+    
+    // Clear WebView cookies and redirect to auth
+    if (webViewRef.current) {
+      const script = `
+        (function() {
+          try {
+            // Clear localStorage
+            localStorage.clear();
             
-            // Clear WebView cookies and redirect to auth
-            if (webViewRef.current) {
-              const script = `
-                (function() {
-                  try {
-                    // Clear localStorage
-                    localStorage.clear();
-                    
-                    // Redirect to logout endpoint
-                    window.location.href = '${BASE_URL}/auth/logout?source=app';
-                  } catch (e) {
-                    console.error('Error during logout:', e);
-                  }
-                })();
-                true;
-              `;
-              webViewRef.current.injectJavaScript(script);
-            }
-            
-            // Redirect to auth screen
-            router.replace('/auth');
-          },
-        },
-      ]
-    );
+            // Redirect to logout endpoint
+            window.location.href = '${BASE_URL}/auth/logout?source=app';
+          } catch (e) {
+            console.error('Error during logout:', e);
+          }
+        })();
+        true;
+      `;
+      webViewRef.current.injectJavaScript(script);
+    }
+    
+    // Redirect to auth screen
+    router.replace('/auth');
   };
 
   const handleWebViewMessage = (event: any) => {
@@ -139,20 +149,35 @@ export default function AccountScreen() {
 
       if (message.type === 'USER_INFO' && message.data) {
         console.log('AccountScreen: Received user info:', message.data);
-        if (message.data.name) setUserName(message.data.name);
+        if (message.data.first_name || message.data.firstName) {
+          setFirstName(message.data.first_name || message.data.firstName);
+        }
+        if (message.data.last_name || message.data.lastName) {
+          setLastName(message.data.last_name || message.data.lastName);
+        }
+        if (message.data.company) setCompany(message.data.company);
         if (message.data.email) setUserEmail(message.data.email);
-        if (message.data.created_at) {
-          const date = new Date(message.data.created_at);
+        if (message.data.created_at || message.data.createdAt) {
+          const dateStr = message.data.created_at || message.data.createdAt;
+          const date = new Date(dateStr);
           setDateJoined(date.toLocaleDateString());
         }
+        setIsLoadingProfile(false);
       }
     } catch (error) {
       console.error('AccountScreen: Error handling WebView message:', error);
+      setIsLoadingProfile(false);
     }
   };
 
-  const themeText = theme === 'system' ? 'System Default' : theme === 'dark' ? 'Dark' : 'Light';
-  const languageText = language === 'en' ? 'English' : 'Français';
+  // Calculate display name
+  const displayName = firstName && lastName 
+    ? `${firstName} ${lastName}` 
+    : firstName || lastName || 'User';
+  
+  const initials = firstName && lastName
+    ? `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
+    : displayName.charAt(0).toUpperCase();
 
   return (
     <SafeAreaView
@@ -172,61 +197,72 @@ export default function AccountScreen() {
         />
       </View>
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
-        {/* User Info Section */}
-        <View style={[styles.section, { backgroundColor: themeColors.cardBackground }]}>
-          <View style={styles.userInfoContainer}>
-            <View style={[styles.avatarPlaceholder, { backgroundColor: colors.ptoGreen }]}>
-              <Text style={styles.avatarText}>
-                {userName.charAt(0).toUpperCase()}
+      <ScrollView 
+        style={styles.scrollView} 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Profile Header */}
+        <View style={[styles.profileHeader, { backgroundColor: themeColors.cardBackground || themeColors.card }]}>
+          {isLoadingProfile ? (
+            <React.Fragment>
+              <View style={[styles.avatarCircle, { backgroundColor: colors.ptoGreen + '40' }]}>
+                <ActivityIndicator size="large" color={colors.ptoGreen} />
+              </View>
+              <Text style={[styles.displayName, { color: themeColors.foreground || themeColors.text, opacity: 0.5 }]}>
+                Loading...
               </Text>
-            </View>
-            <View style={styles.userDetails}>
-              <Text style={[styles.userName, { color: themeColors.text }]}>
-                {userName}
+            </React.Fragment>
+          ) : (
+            <React.Fragment>
+              <View style={[styles.avatarCircle, { backgroundColor: colors.ptoGreen }]}>
+                <Text style={styles.avatarText}>
+                  {initials}
+                </Text>
+              </View>
+              <Text style={[styles.displayName, { color: themeColors.foreground || themeColors.text }]}>
+                {displayName}
               </Text>
+              {company ? (
+                <Text style={[styles.companyText, { color: themeColors.mutedText }]}>
+                  {company}
+                </Text>
+              ) : null}
               {userEmail ? (
-                <Text style={[styles.userEmail, { color: themeColors.mutedText }]}>
+                <Text style={[styles.emailText, { color: themeColors.mutedText }]}>
                   {userEmail}
                 </Text>
               ) : null}
-              {dateJoined ? (
-                <Text style={[styles.dateJoined, { color: themeColors.mutedText }]}>
-                  Joined
-                </Text>
-              ) : null}
-              {dateJoined ? (
-                <Text style={[styles.dateJoined, { color: themeColors.mutedText }]}>
-                  {dateJoined}
-                </Text>
-              ) : null}
-            </View>
-          </View>
+            </React.Fragment>
+          )}
         </View>
 
         {/* Notifications */}
         <TouchableOpacity
-          style={[styles.section, styles.notificationSection, { backgroundColor: themeColors.cardBackground }]}
+          style={[styles.menuItem, { backgroundColor: themeColors.cardBackground || themeColors.card }]}
           onPress={() => {
             console.log('User tapped notifications');
             router.push('/notifications');
           }}
+          activeOpacity={0.7}
         >
-          <View style={styles.sectionHeader}>
-            <IconSymbol
-              ios_icon_name="bell.fill"
-              android_material_icon_name="notifications"
-              size={24}
-              color={colors.ptoGreen}
-            />
-            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
+          <View style={styles.menuItemLeft}>
+            <View style={[styles.iconContainer, { backgroundColor: colors.ptoGreen + '20' }]}>
+              <IconSymbol
+                ios_icon_name="bell.fill"
+                android_material_icon_name="notifications"
+                size={20}
+                color={colors.ptoGreen}
+              />
+            </View>
+            <Text style={[styles.menuItemText, { color: themeColors.foreground || themeColors.text }]}>
               Notifications
             </Text>
           </View>
-          <View style={styles.notificationBadgeContainer}>
+          <View style={styles.menuItemRight}>
             {unreadCount > 0 ? (
-              <View style={styles.notificationBadge}>
-                <Text style={styles.notificationBadgeText}>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
                   {unreadCount}
                 </Text>
               </View>
@@ -240,118 +276,161 @@ export default function AccountScreen() {
           </View>
         </TouchableOpacity>
 
-        {/* Settings Section */}
-        <View style={[styles.section, { backgroundColor: themeColors.cardBackground }]}>
-          <View style={styles.sectionHeader}>
-            <IconSymbol
-              ios_icon_name="gear"
-              android_material_icon_name="settings"
-              size={24}
-              color={colors.ptoGreen}
-            />
-            <Text style={[styles.sectionTitle, { color: themeColors.text }]}>
-              Settings
-            </Text>
-          </View>
+        {/* Settings Section Header */}
+        <Text style={[styles.sectionHeader, { color: themeColors.mutedText }]}>
+          SETTINGS
+        </Text>
 
-          {/* Theme Toggle */}
-          <View style={styles.settingRow}>
-            <Text style={[styles.settingLabel, { color: themeColors.text }]}>
-              Theme
-            </Text>
-            <View style={styles.themeButtons}>
-              <TouchableOpacity
-                style={[
-                  styles.themeButton,
-                  theme === 'light' && styles.themeButtonActive,
-                  { borderColor: themeColors.border },
-                ]}
-                onPress={() => handleThemeChange('light')}
-              >
-                <Text
-                  style={[
-                    styles.themeButtonText,
-                    { color: themeColors.text },
-                    theme === 'light' && styles.themeButtonTextActive,
-                  ]}
-                >
-                  Light
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.themeButton,
-                  theme === 'dark' && styles.themeButtonActive,
-                  { borderColor: themeColors.border },
-                ]}
-                onPress={() => handleThemeChange('dark')}
-              >
-                <Text
-                  style={[
-                    styles.themeButtonText,
-                    { color: themeColors.text },
-                    theme === 'dark' && styles.themeButtonTextActive,
-                  ]}
-                >
-                  Dark
-                </Text>
-              </TouchableOpacity>
+        {/* Theme Setting */}
+        <View style={[styles.settingCard, { backgroundColor: themeColors.cardBackground || themeColors.card }]}>
+          <View style={styles.settingHeader}>
+            <View style={styles.settingHeaderLeft}>
+              <View style={[styles.iconContainer, { backgroundColor: colors.ptoGreen + '20' }]}>
+                <IconSymbol
+                  ios_icon_name="moon.fill"
+                  android_material_icon_name="brightness-4"
+                  size={20}
+                  color={colors.ptoGreen}
+                />
+              </View>
+              <Text style={[styles.settingLabel, { color: themeColors.foreground || themeColors.text }]}>
+                Theme
+              </Text>
             </View>
           </View>
-
-          {/* Language Toggle */}
-          <View style={styles.settingRow}>
-            <Text style={[styles.settingLabel, { color: themeColors.text }]}>
-              Language
-            </Text>
-            <View style={styles.themeButtons}>
-              <TouchableOpacity
+          <View style={styles.optionButtons}>
+            <TouchableOpacity
+              style={[
+                styles.optionButton,
+                { borderColor: themeColors.border },
+                theme === 'light' && [styles.optionButtonActive, { backgroundColor: colors.ptoGreen }],
+              ]}
+              onPress={() => handleThemeChange('light')}
+              activeOpacity={0.7}
+            >
+              <Text
                 style={[
-                  styles.themeButton,
-                  language === 'en' && styles.themeButtonActive,
-                  { borderColor: themeColors.border },
+                  styles.optionButtonText,
+                  { color: themeColors.foreground || themeColors.text },
+                  theme === 'light' && styles.optionButtonTextActive,
                 ]}
-                onPress={() => handleLanguageChange('en')}
               >
-                <Text
-                  style={[
-                    styles.themeButtonText,
-                    { color: themeColors.text },
-                    language === 'en' && styles.themeButtonTextActive,
-                  ]}
-                >
-                  English
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
+                Light
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.optionButton,
+                { borderColor: themeColors.border },
+                theme === 'dark' && [styles.optionButtonActive, { backgroundColor: colors.ptoGreen }],
+              ]}
+              onPress={() => handleThemeChange('dark')}
+              activeOpacity={0.7}
+            >
+              <Text
                 style={[
-                  styles.themeButton,
-                  language === 'fr' && styles.themeButtonActive,
-                  { borderColor: themeColors.border },
+                  styles.optionButtonText,
+                  { color: themeColors.foreground || themeColors.text },
+                  theme === 'dark' && styles.optionButtonTextActive,
                 ]}
-                onPress={() => handleLanguageChange('fr')}
               >
-                <Text
-                  style={[
-                    styles.themeButtonText,
-                    { color: themeColors.text },
-                    language === 'fr' && styles.themeButtonTextActive,
-                  ]}
-                >
-                  Français
-                </Text>
-              </TouchableOpacity>
-            </View>
+                Dark
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.optionButton,
+                { borderColor: themeColors.border },
+                theme === 'system' && [styles.optionButtonActive, { backgroundColor: colors.ptoGreen }],
+              ]}
+              onPress={() => handleThemeChange('system')}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.optionButtonText,
+                  { color: themeColors.foreground || themeColors.text },
+                  theme === 'system' && styles.optionButtonTextActive,
+                ]}
+              >
+                System
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
 
-        {/* Links Section */}
-        <View style={[styles.section, { backgroundColor: themeColors.cardBackground }]}>
+        {/* Language Setting */}
+        <View style={[styles.settingCard, { backgroundColor: themeColors.cardBackground || themeColors.card }]}>
+          <View style={styles.settingHeader}>
+            <View style={styles.settingHeaderLeft}>
+              <View style={[styles.iconContainer, { backgroundColor: colors.ptoGreen + '20' }]}>
+                <IconSymbol
+                  ios_icon_name="globe"
+                  android_material_icon_name="language"
+                  size={20}
+                  color={colors.ptoGreen}
+                />
+              </View>
+              <Text style={[styles.settingLabel, { color: themeColors.foreground || themeColors.text }]}>
+                Language
+              </Text>
+            </View>
+          </View>
+          <View style={styles.optionButtons}>
+            <TouchableOpacity
+              style={[
+                styles.optionButton,
+                { borderColor: themeColors.border },
+                language === 'en' && [styles.optionButtonActive, { backgroundColor: colors.ptoGreen }],
+              ]}
+              onPress={() => handleLanguageChange('en')}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.optionButtonText,
+                  { color: themeColors.foreground || themeColors.text },
+                  language === 'en' && styles.optionButtonTextActive,
+                ]}
+              >
+                English
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.optionButton,
+                { borderColor: themeColors.border },
+                language === 'fr' && [styles.optionButtonActive, { backgroundColor: colors.ptoGreen }],
+              ]}
+              onPress={() => handleLanguageChange('fr')}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.optionButtonText,
+                  { color: themeColors.foreground || themeColors.text },
+                  language === 'fr' && styles.optionButtonTextActive,
+                ]}
+              >
+                Français
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Links Section Header */}
+        <Text style={[styles.sectionHeader, { color: themeColors.mutedText }]}>
+          SUPPORT
+        </Text>
+
+        {/* Support Links */}
+        <View style={[styles.linksCard, { backgroundColor: themeColors.cardBackground || themeColors.card }]}>
           <TouchableOpacity
-            style={styles.linkRow}
+            style={styles.linkItem}
             onPress={() => handleLinkPress(`${BASE_URL}/support`, 'Support')}
+            activeOpacity={0.7}
           >
-            <Text style={[styles.linkText, { color: themeColors.text }]}>
+            <Text style={[styles.linkText, { color: themeColors.foreground || themeColors.text }]}>
               Support
             </Text>
             <IconSymbol
@@ -362,13 +441,14 @@ export default function AccountScreen() {
             />
           </TouchableOpacity>
 
-          <View style={[styles.linkDivider, { backgroundColor: themeColors.border }]} />
+          <View style={[styles.divider, { backgroundColor: themeColors.border }]} />
 
           <TouchableOpacity
-            style={styles.linkRow}
+            style={styles.linkItem}
             onPress={() => handleLinkPress(`${BASE_URL}/league-rules`, 'League Rules')}
+            activeOpacity={0.7}
           >
-            <Text style={[styles.linkText, { color: themeColors.text }]}>
+            <Text style={[styles.linkText, { color: themeColors.foreground || themeColors.text }]}>
               League Rules
             </Text>
             <IconSymbol
@@ -379,13 +459,14 @@ export default function AccountScreen() {
             />
           </TouchableOpacity>
 
-          <View style={[styles.linkDivider, { backgroundColor: themeColors.border }]} />
+          <View style={[styles.divider, { backgroundColor: themeColors.border }]} />
 
           <TouchableOpacity
-            style={styles.linkRow}
+            style={styles.linkItem}
             onPress={() => handleLinkPress(`${BASE_URL}/privacy-policy`, 'Privacy Policy')}
+            activeOpacity={0.7}
           >
-            <Text style={[styles.linkText, { color: themeColors.text }]}>
+            <Text style={[styles.linkText, { color: themeColors.foreground || themeColors.text }]}>
               Privacy Policy
             </Text>
             <IconSymbol
@@ -399,10 +480,17 @@ export default function AccountScreen() {
 
         {/* Logout Button */}
         <TouchableOpacity
-          style={[styles.logoutButton, { backgroundColor: themeColors.cardBackground }]}
+          style={[styles.logoutButton, { backgroundColor: themeColors.cardBackground || themeColors.card }]}
           onPress={handleLogout}
+          activeOpacity={0.7}
         >
-          <Text style={styles.logoutButtonText}>
+          <IconSymbol
+            ios_icon_name="arrow.right.square"
+            android_material_icon_name="logout"
+            size={20}
+            color={colors.destructive}
+          />
+          <Text style={[styles.logoutText, { color: colors.destructive }]}>
             Sign Out
           </Text>
         </TouchableOpacity>
@@ -412,6 +500,48 @@ export default function AccountScreen() {
           Version 1.0.0
         </Text>
       </ScrollView>
+
+      {/* Logout Confirmation Modal */}
+      <Modal
+        visible={showLogoutModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowLogoutModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: themeColors.cardBackground || themeColors.card }]}>
+            <Text style={[styles.modalTitle, { color: themeColors.foreground || themeColors.text }]}>
+              Sign Out
+            </Text>
+            <Text style={[styles.modalMessage, { color: themeColors.mutedText }]}>
+              Are you sure you want to sign out?
+            </Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonCancel, { borderColor: themeColors.border }]}
+                onPress={() => {
+                  console.log('User cancelled logout');
+                  setShowLogoutModal(false);
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.modalButtonText, { color: themeColors.foreground || themeColors.text }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.modalButtonConfirm, { backgroundColor: colors.destructive }]}
+                onPress={confirmLogout}
+                activeOpacity={0.7}
+              >
+                <Text style={[styles.modalButtonText, styles.modalButtonTextConfirm]}>
+                  Sign Out
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -427,93 +557,139 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     paddingBottom: 100, // Extra padding for tab bar
   },
-  section: {
-    borderRadius: 12,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    ...commonStyles.cardShadow,
-  },
-  notificationSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  profileHeader: {
+    borderRadius: spacing.borderRadius,
+    padding: spacing.xl,
     alignItems: 'center',
+    marginBottom: spacing.lg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
   },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontFamily: typography.bold,
-    marginLeft: spacing.sm,
-  },
-  userInfoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatarPlaceholder: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
+  avatarCircle: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
     justifyContent: 'center',
     alignItems: 'center',
+    marginBottom: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 4,
   },
   avatarText: {
-    fontSize: 28,
+    fontSize: 40,
     fontFamily: typography.bold,
     color: '#FFFFFF',
   },
-  userDetails: {
-    marginLeft: spacing.md,
-    flex: 1,
-  },
-  userName: {
-    fontSize: 20,
+  displayName: {
+    fontSize: 28,
     fontFamily: typography.bold,
-    marginBottom: 4,
+    marginBottom: 6,
+    letterSpacing: -0.5,
   },
-  userEmail: {
+  companyText: {
+    fontSize: 16,
+    fontFamily: typography.medium,
+    marginBottom: 4,
+    opacity: 0.8,
+  },
+  emailText: {
     fontSize: 14,
     fontFamily: typography.regular,
-    marginBottom: 4,
+    opacity: 0.6,
   },
-  dateJoined: {
-    fontSize: 12,
-    fontFamily: typography.regular,
+  sectionHeader: {
+    fontSize: 13,
+    fontFamily: typography.bold,
+    letterSpacing: 1,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+    marginLeft: 4,
+    textTransform: 'uppercase',
   },
-  notificationBadgeContainer: {
+  menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.md,
+    borderRadius: spacing.borderRadius,
+    marginBottom: spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  notificationBadge: {
-    backgroundColor: colors.ptoGreen,
-    borderRadius: 12,
-    minWidth: 24,
-    height: 24,
+  menuItemLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  menuItemRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  iconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: spacing.sm,
-    paddingHorizontal: 8,
   },
-  notificationBadgeText: {
+  menuItemText: {
+    fontSize: 16,
+    fontFamily: typography.medium,
+  },
+  badge: {
+    backgroundColor: colors.ptoGreen,
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  badgeText: {
     color: '#FFFFFF',
     fontSize: 12,
     fontFamily: typography.bold,
   },
-  settingRow: {
+  settingCard: {
+    borderRadius: spacing.borderRadius,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  settingHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     marginBottom: spacing.md,
+  },
+  settingHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   settingLabel: {
     fontSize: 16,
     fontFamily: typography.medium,
-    marginBottom: spacing.sm,
   },
-  themeButtons: {
+  optionButtons: {
     flexDirection: 'row',
     gap: spacing.sm,
   },
-  themeButton: {
+  optionButton: {
     flex: 1,
     height: 40,
     borderRadius: 8,
@@ -521,46 +697,111 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  themeButtonActive: {
-    backgroundColor: colors.ptoGreen,
+  optionButtonActive: {
     borderColor: colors.ptoGreen,
   },
-  themeButtonText: {
+  optionButtonText: {
     fontSize: 14,
     fontFamily: typography.medium,
   },
-  themeButtonTextActive: {
+  optionButtonTextActive: {
     color: '#FFFFFF',
   },
-  linkRow: {
+  linksCard: {
+    borderRadius: spacing.borderRadius,
+    overflow: 'hidden',
+    marginBottom: spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
+  },
+  linkItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing.md,
+    justifyContent: 'space-between',
+    padding: spacing.md,
   },
   linkText: {
     fontSize: 16,
     fontFamily: typography.regular,
   },
-  linkDivider: {
+  divider: {
     height: 1,
+    marginLeft: spacing.md,
   },
   logoutButton: {
-    borderRadius: 12,
-    padding: spacing.lg,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.md,
+    borderRadius: spacing.borderRadius,
     marginBottom: spacing.md,
-    ...commonStyles.cardShadow,
+    gap: spacing.sm,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 1,
   },
-  logoutButtonText: {
+  logoutText: {
     fontSize: 16,
     fontFamily: typography.bold,
-    color: colors.destructive,
   },
   versionText: {
     fontSize: 12,
     fontFamily: typography.regular,
     textAlign: 'center',
     marginBottom: spacing.md,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: spacing.borderRadius,
+    padding: spacing.lg,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: typography.bold,
+    marginBottom: spacing.sm,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 16,
+    fontFamily: typography.regular,
+    marginBottom: spacing.lg,
+    textAlign: 'center',
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+  },
+  modalButton: {
+    flex: 1,
+    height: 44,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalButtonCancel: {
+    borderWidth: 1,
+  },
+  modalButtonConfirm: {
+    // backgroundColor set dynamically
+  },
+  modalButtonText: {
+    fontSize: 16,
+    fontFamily: typography.medium,
+  },
+  modalButtonTextConfirm: {
+    color: '#FFFFFF',
   },
 });

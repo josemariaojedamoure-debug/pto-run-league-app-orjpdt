@@ -1,6 +1,6 @@
 
 import React, { useEffect } from 'react';
-import { useColorScheme, View, ActivityIndicator } from "react-native";
+import { useColorScheme, View, ActivityIndicator, Text } from "react-native";
 import { Stack } from "expo-router";
 import "react-native-reanimated";
 import { StatusBar } from "expo-status-bar";
@@ -10,7 +10,7 @@ import {
   Theme,
   ThemeProvider as NavigationThemeProvider,
 } from "@react-navigation/native";
-import { colors } from "@/styles/commonStyles";
+import { colors, typography } from "@/styles/commonStyles";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import { SystemBars } from "react-native-edge-to-edge";
@@ -35,11 +35,14 @@ function RootLayoutContent() {
     }
   }, [loaded]);
 
-  // Show native green loading screen while fonts are loading
+  // Show white loading screen while fonts are loading (changed from green)
   if (!loaded) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.ptoGreen }}>
-        <ActivityIndicator size="large" color="#FFFFFF" />
+      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#FFFFFF' }}>
+        <ActivityIndicator size="large" color={colors.ptoGreen} />
+        <Text style={{ marginTop: 16, fontSize: 16, fontFamily: typography.regular, color: colors.ptoGreen }}>
+          Loading...
+        </Text>
       </View>
     );
   }

@@ -64,16 +64,16 @@ export default function AuthScreen() {
 
   console.log('Loading auth WebView with URL:', authUrl);
 
-  // Show native green screen while checking auth
+  // Show white loading screen while checking auth (changed from green)
   if (isCheckingAuth) {
     return (
       <SafeAreaView
-        style={[styles.container, { backgroundColor: colors.ptoGreen }]}
+        style={[styles.container, { backgroundColor: '#FFFFFF' }]}
         edges={['top', 'bottom']}
       >
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#FFFFFF" />
-          <Text style={styles.loadingTextWhite}>
+          <ActivityIndicator size="large" color={colors.ptoGreen} />
+          <Text style={[styles.loadingText, { color: colors.ptoGreen }]}>
             Completing sign in...
           </Text>
         </View>
@@ -92,9 +92,9 @@ export default function AuthScreen() {
         style={styles.webview}
         startInLoadingState={true}
         renderLoading={() => (
-          <View style={[styles.loadingContainer, { backgroundColor: colors.ptoGreen }]}>
-            <ActivityIndicator size="large" color="#FFFFFF" />
-            <Text style={styles.loadingTextWhite}>
+          <View style={[styles.loadingContainer, { backgroundColor: '#FFFFFF' }]}>
+            <ActivityIndicator size="large" color={colors.ptoGreen} />
+            <Text style={[styles.loadingText, { color: colors.ptoGreen }]}>
               Loading...
             </Text>
           </View>
@@ -131,10 +131,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingTextWhite: {
+  loadingText: {
     marginTop: 16,
     fontSize: 16,
     fontFamily: typography.regular,
-    color: '#FFFFFF',
   },
 });

@@ -171,9 +171,9 @@ export default function RankingsScreen() {
           style={styles.webview}
           startInLoadingState={true}
           renderLoading={() => (
-            <View style={[styles.loadingContainer, { backgroundColor: colors.ptoGreen }]}>
-              <ActivityIndicator size="large" color="#FFFFFF" />
-              <Text style={styles.loadingTextWhite}>
+            <View style={[styles.loadingContainer, { backgroundColor: '#FFFFFF' }]}>
+              <ActivityIndicator size="large" color={colors.ptoGreen} />
+              <Text style={[styles.loadingText, { color: colors.ptoGreen }]}>
                 Loading rankings...
               </Text>
             </View>
@@ -206,11 +206,11 @@ export default function RankingsScreen() {
           thirdPartyCookiesEnabled={true}
         />
         
-        {/* Show native green loading screen while WebView is loading */}
+        {/* Show white loading screen while WebView is loading (changed from green) */}
         {isWebViewLoading && (
-          <View style={[styles.loadingOverlay, { backgroundColor: colors.ptoGreen }]}>
-            <ActivityIndicator size="large" color="#FFFFFF" />
-            <Text style={styles.loadingTextWhite}>
+          <View style={[styles.loadingOverlay, { backgroundColor: '#FFFFFF' }]}>
+            <ActivityIndicator size="large" color={colors.ptoGreen} />
+            <Text style={[styles.loadingText, { color: colors.ptoGreen }]}>
               Loading rankings...
             </Text>
           </View>
@@ -248,10 +248,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  loadingTextWhite: {
+  loadingText: {
     marginTop: 16,
     fontSize: 16,
     fontFamily: typography.regular,
-    color: '#FFFFFF',
   },
 });

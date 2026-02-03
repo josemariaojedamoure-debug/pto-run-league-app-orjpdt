@@ -75,6 +75,7 @@ export function SupabaseProvider({ children }: { children: ReactNode }) {
       console.log('SupabaseProvider: Cleaning up auth listener');
       subscription.unsubscribe();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchProfile = async (authUserId: string) => {

@@ -36,18 +36,15 @@ export default function TabLayout() {
         <Stack.Screen name="account" />
       </Stack>
 
-      {/* Custom Bottom Tab Bar - Pill Style with White Bubble Indicator */}
+      {/* Custom Bottom Tab Bar - Transparent with Grey Background and White Bubble */}
       <SafeAreaView
         edges={['bottom']}
-        style={[
-          styles.tabBarContainer,
-          { backgroundColor: themeColors.background },
-        ]}
+        style={styles.tabBarContainer}
       >
         <View style={[
           styles.tabBar,
           { 
-            backgroundColor: effectiveTheme === 'dark' ? '#3E3C3C' : '#F3F4F6',
+            backgroundColor: effectiveTheme === 'dark' ? 'rgba(62, 60, 60, 0.9)' : 'rgba(243, 244, 246, 0.9)',
           },
         ]}>
           {tabs.map((tab) => {
@@ -90,6 +87,7 @@ const styles = StyleSheet.create({
   tabBarContainer: {
     paddingHorizontal: 16,
     paddingBottom: 8,
+    backgroundColor: 'transparent',
   },
   tabBar: {
     flexDirection: 'row',
