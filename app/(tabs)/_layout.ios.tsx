@@ -10,14 +10,30 @@ import { useTheme } from '@/contexts/ThemeContext';
 export default function TabLayout() {
   const router = useRouter();
   const pathname = usePathname();
-  const { effectiveTheme } = useTheme();
+  const { effectiveTheme, language } = useTheme();
 
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
 
+  // Tab labels with translations
   const tabs = [
-    { name: 'Dashboard', route: '/(tabs)/dashboard', iosIcon: 'house.fill', androidIcon: 'home' },
-    { name: 'Rankings', route: '/(tabs)/rankings', iosIcon: 'chart.bar.fill', androidIcon: 'leaderboard' },
-    { name: 'Account', route: '/(tabs)/account', iosIcon: 'person.fill', androidIcon: 'person' },
+    { 
+      name: language === 'fr' ? 'Tableau de bord' : 'Dashboard', 
+      route: '/(tabs)/dashboard', 
+      iosIcon: 'house.fill', 
+      androidIcon: 'home' 
+    },
+    { 
+      name: language === 'fr' ? 'Classements' : 'Rankings', 
+      route: '/(tabs)/rankings', 
+      iosIcon: 'chart.bar.fill', 
+      androidIcon: 'leaderboard' 
+    },
+    { 
+      name: language === 'fr' ? 'Compte' : 'Account', 
+      route: '/(tabs)/account', 
+      iosIcon: 'person.fill', 
+      androidIcon: 'person' 
+    },
   ];
 
   const isActive = (route: string) => {
@@ -52,35 +68,38 @@ export default function TabLayout() {
             const active = isActive(tab.route);
             return (
               <TouchableOpacity
-                key={tab.name}
-                style={[
-                  styles.tabButton,
-                  active && styles.activeTabButton,
-                ]}
+                key={tab.route}
+                style={styles.tabButtonContainer}
                 onPress={() => {
                   console.log('User tapped', tab.name, 'tab');
                   router.push(tab.route as any);
                 }}
               >
-                <IconSymbol
-                  ios_icon_name={tab.iosIcon}
-                  android_material_icon_name={tab.androidIcon}
-                  size={24}
-                  color={active ? colors.ptoGreen : (themeColors.mutedText || themeColors.secondaryText)}
-                />
-                <Text
-                  style={[
-                    styles.tabLabel,
-                    {
-                      color: active
-                        ? colors.ptoGreen
-                        : (themeColors.mutedText || themeColors.secondaryText),
-                      fontWeight: active ? '600' : '400',
-                    },
-                  ]}
-                >
-                  {tab.name}
-                </Text>
+                {/* White bubble - narrower than the full button width */}
+                {active && (
+                  <View style={styles.whiteBubble} />
+                )}
+                <View style={styles.tabContent}>
+                  <IconSymbol
+                    ios_icon_name={tab.iosIcon}
+                    android_material_icon_name={tab.androidIcon}
+                    size={24}
+                    color={active ? colors.ptoGreen : (themeColors.mutedText || themeColors.secondaryText)}
+                  />
+                  <Text
+                    style={[
+                      styles.tabLabel,
+                      {
+                        color: active
+                          ? colors.ptoGreen
+                          : (themeColors.mutedText || themeColors.secondaryText),
+                        fontWeight: active ? '600' : '400',
+                      },
+                    ]}
+                  >
+                    {tab.name}
+                  </Text>
+                </View>
               </TouchableOpacity>
             );
           })}
@@ -113,21 +132,30 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-  tabButton: {
+  tabButtonContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 24,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    position: 'relative',
   },
-  activeTabButton: {
+  whiteBubble: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    left: 8,
+    right: 8,
     backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
+  },
+  tabContent: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 1,
   },
   tabLabel: {
     fontSize: 12,

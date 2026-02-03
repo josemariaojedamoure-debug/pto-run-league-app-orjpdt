@@ -9,14 +9,24 @@ import { colors, typography, spacing } from '@/styles/commonStyles';
 export default function TabLayout() {
   const router = useRouter();
   const pathname = usePathname();
-  const { effectiveTheme } = useTheme();
+  const { effectiveTheme, language } = useTheme();
 
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
 
+  // Tab labels with translations
   const tabs = [
-    { name: 'Dashboard', route: '/(tabs)/dashboard' },
-    { name: 'Rankings', route: '/(tabs)/rankings' },
-    { name: 'Account', route: '/(tabs)/account' },
+    { 
+      name: language === 'fr' ? 'Tableau de bord' : 'Dashboard', 
+      route: '/(tabs)/dashboard' 
+    },
+    { 
+      name: language === 'fr' ? 'Classements' : 'Rankings', 
+      route: '/(tabs)/rankings' 
+    },
+    { 
+      name: language === 'fr' ? 'Compte' : 'Account', 
+      route: '/(tabs)/account' 
+    },
   ];
 
   const isActive = (route: string) => {
@@ -51,16 +61,17 @@ export default function TabLayout() {
             const active = isActive(tab.route);
             return (
               <TouchableOpacity
-                key={tab.name}
-                style={[
-                  styles.tabButton,
-                  active && styles.activeTabButton,
-                ]}
+                key={tab.route}
+                style={styles.tabButtonContainer}
                 onPress={() => {
                   console.log('User tapped', tab.name, 'tab');
                   router.push(tab.route as any);
                 }}
               >
+                {/* White bubble - narrower than the full button width */}
+                {active && (
+                  <View style={styles.whiteBubble} />
+                )}
                 <Text
                   style={[
                     styles.tabLabel,
@@ -106,16 +117,20 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 8,
   },
-  tabButton: {
+  tabButtonContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 24,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    position: 'relative',
   },
-  activeTabButton: {
+  whiteBubble: {
+    position: 'absolute',
+    top: 4,
+    bottom: 4,
+    left: 8,
+    right: 8,
     backgroundColor: '#FFFFFF',
+    borderRadius: 20,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
@@ -125,5 +140,6 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 12,
     fontFamily: 'Helvetica Neue',
+    zIndex: 1,
   },
 });
