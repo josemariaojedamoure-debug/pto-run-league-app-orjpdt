@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import { useNotifications } from '@/contexts/NotificationContext';
 import { useTheme } from '@/contexts/ThemeContext';
 import { colors, typography, spacing } from '@/styles/commonStyles';
 import * as WebBrowser from 'expo-web-browser';
-import { WebView } from 'react-native-webview';
+import { WebView, WebViewMessageEvent } from 'react-native-webview';
 
 const BASE_URL = 'https://publictimeoff.com';
 
@@ -28,15 +28,22 @@ export default function AccountScreen() {
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
   
   // User profile state
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
-  const [company, setCompany] = useState('');
-  const [userEmail, setUserEmail] = useState('');
-  const [dateJoined, setDateJoined] = useState('');
-  const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [userData, setUserData] = useState<{
+    firstName: string | null;
+    lastName: string | null;
+    email: string | null;
+    company?: string | null;
+  }>({
+    firstName: null,
+    lastName: null,
+    email: null,
+    company: null,
+  });
+  const [isLoading, setIsLoading] = useState(true);
   
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const webViewRef = useRef<WebView>(null);
+  const userInfoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   console.log('AccountScreen - Theme:', theme, 'Effective:', effectiveTheme, 'Language:', language);
 
@@ -86,79 +93,151 @@ export default function AccountScreen() {
 
   const t = translations[language];
 
-  // Fetch user profile from WebView
-  useEffect(() => {
-    // Wait for WebView to load before requesting user info
-    const timer = setTimeout(() => {
-      fetchUserProfile();
-    }, 2000); // Give WebView time to load
+  // Request user info from WebView
+  const requestUserInfo = useCallback(() => {
+    if (!webViewRef.current) {
+      console.log('AccountScreen: WebView ref not available yet');
+      return;
+    }
 
-    return () => clearTimeout(timer);
+    console.log('AccountScreen: Requesting user info from WebView');
+    
+    const script = `
+      (function() {
+        try {
+          let userData = null;
+          
+          // Try multiple possible localStorage keys
+          const possibleKeys = ['user_data', 'userData', 'currentUser', 'user', 'auth_user'];
+          for (const key of possibleKeys) {
+            const data = localStorage.getItem(key);
+            if (data) {
+              try {
+                userData = JSON.parse(data);
+                console.log('[Account WebView] Found user data in localStorage key:', key);
+                break;
+              } catch (e) {
+                console.log('[Account WebView] Failed to parse data from key:', key);
+              }
+            }
+          }
+          
+          // If no localStorage data, try window object
+          if (!userData && window.currentUser) {
+            userData = window.currentUser;
+            console.log('[Account WebView] Found user data in window.currentUser');
+          }
+          
+          // Send user data to native app
+          if (userData && window.ReactNativeWebView) {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'USER_INFO',
+              data: userData
+            }));
+            console.log('[Account WebView] Sent user data to native app');
+          } else {
+            window.ReactNativeWebView.postMessage(JSON.stringify({
+              type: 'USER_INFO_NOT_FOUND'
+            }));
+            console.log('[Account WebView] No user data found');
+          }
+        } catch (e) {
+          console.error('[Account WebView] Error getting user info:', e);
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'USER_INFO_ERROR',
+            error: e.message
+          }));
+        }
+      })();
+      true;
+    `;
+    
+    webViewRef.current.injectJavaScript(script);
+    
+    // Set a timeout to stop loading if no response
+    if (userInfoTimeoutRef.current) {
+      clearTimeout(userInfoTimeoutRef.current);
+    }
+    userInfoTimeoutRef.current = setTimeout(() => {
+      console.log('AccountScreen: User info request timed out');
+      setIsLoading(false);
+    }, 5000);
   }, []);
 
-  const fetchUserProfile = () => {
+  // Handle messages from WebView
+  const handleWebViewMessage = useCallback((event: WebViewMessageEvent) => {
     try {
-      console.log('AccountScreen: Requesting user info from WebView');
-      
-      if (webViewRef.current) {
-        const script = `
-          (function() {
-            try {
-              // Try to get user info from the web app
-              if (window.ReactNativeWebView) {
-                // Try multiple possible data sources
-                let userData = null;
-                
-                // Check localStorage for user data
-                const userDataStr = localStorage.getItem('user_data') || 
-                                   localStorage.getItem('userData') ||
-                                   localStorage.getItem('currentUser');
-                
-                if (userDataStr) {
-                  userData = JSON.parse(userDataStr);
-                }
-                
-                // If no localStorage data, try to get from window object
-                if (!userData && window.currentUser) {
-                  userData = window.currentUser;
-                }
-                
-                // If we have user data, send it to native
-                if (userData) {
-                  window.ReactNativeWebView.postMessage(JSON.stringify({
-                    type: 'USER_INFO',
-                    data: userData
-                  }));
-                } else {
-                  // No user data found, send empty response
-                  window.ReactNativeWebView.postMessage(JSON.stringify({
-                    type: 'USER_INFO',
-                    data: null
-                  }));
-                }
-              }
-            } catch (e) {
-              console.error('Error getting user info:', e);
-              window.ReactNativeWebView.postMessage(JSON.stringify({
-                type: 'USER_INFO_ERROR',
-                error: e.message
-              }));
-            }
-          })();
-          true;
-        `;
-        webViewRef.current.injectJavaScript(script);
+      const message = JSON.parse(event.nativeEvent.data);
+      console.log('AccountScreen: Received message from WebView:', message.type);
+
+      if (message.type === 'USER_INFO' && message.data) {
+        console.log('AccountScreen: Received user info:', message.data);
+        
+        // Parse user data - handle various possible formats
+        let parsedData = message.data;
+        if (typeof parsedData === 'string') {
+          try {
+            parsedData = JSON.parse(parsedData);
+          } catch (e) {
+            console.error('AccountScreen: Failed to parse user data string:', e);
+          }
+        }
+        
+        // Extract user information with multiple fallbacks
+        const firstName = parsedData.first_name || 
+                         parsedData.firstName || 
+                         parsedData.given_name ||
+                         (parsedData.name ? parsedData.name.split(' ')[0] : null);
+        
+        const lastName = parsedData.last_name || 
+                        parsedData.lastName || 
+                        parsedData.family_name ||
+                        (parsedData.name ? parsedData.name.split(' ').slice(1).join(' ') : null);
+        
+        const email = parsedData.email || parsedData.emailAddress || null;
+        const company = parsedData.company || parsedData.organization || null;
+        
+        console.log('AccountScreen: Extracted user data - firstName:', firstName, 'lastName:', lastName, 'email:', email);
+        
+        setUserData({
+          firstName,
+          lastName,
+          email,
+          company,
+        });
+        setIsLoading(false);
+        
+        // Clear timeout
+        if (userInfoTimeoutRef.current) {
+          clearTimeout(userInfoTimeoutRef.current);
+        }
+      } else if (message.type === 'USER_INFO_NOT_FOUND') {
+        console.log('AccountScreen: No user data found in WebView');
+        setIsLoading(false);
+        if (userInfoTimeoutRef.current) {
+          clearTimeout(userInfoTimeoutRef.current);
+        }
+      } else if (message.type === 'USER_INFO_ERROR') {
+        console.error('AccountScreen: Error from WebView:', message.error);
+        setIsLoading(false);
+        if (userInfoTimeoutRef.current) {
+          clearTimeout(userInfoTimeoutRef.current);
+        }
       }
-      
-      // Set a fallback timeout to stop loading if no response
-      setTimeout(() => {
-        setIsLoadingProfile(false);
-      }, 5000);
     } catch (error) {
-      console.error('AccountScreen: Error fetching user profile:', error);
-      setIsLoadingProfile(false);
+      console.error('AccountScreen: Error handling WebView message:', error);
+      setIsLoading(false);
     }
-  };
+  }, []);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (userInfoTimeoutRef.current) {
+        clearTimeout(userInfoTimeoutRef.current);
+      }
+    };
+  }, []);
 
   const handleThemeChange = (mode: 'light' | 'dark') => {
     console.log('User changed theme to:', mode);
@@ -214,71 +293,14 @@ export default function AccountScreen() {
     router.replace('/auth');
   };
 
-  const handleWebViewMessage = (event: any) => {
-    try {
-      const message = JSON.parse(event.nativeEvent.data);
-      console.log('AccountScreen: Received message from WebView:', message.type);
-
-      if (message.type === 'USER_INFO') {
-        if (message.data) {
-          console.log('AccountScreen: Received user info:', message.data);
-          
-          // Handle various possible field names
-          const userFirstName = message.data.first_name || 
-                                message.data.firstName || 
-                                message.data.name?.split(' ')[0] || 
-                                '';
-          const userLastName = message.data.last_name || 
-                               message.data.lastName || 
-                               message.data.name?.split(' ').slice(1).join(' ') || 
-                               '';
-          
-          if (userFirstName) {
-            console.log('AccountScreen: Setting first name:', userFirstName);
-            setFirstName(userFirstName);
-          }
-          if (userLastName) {
-            console.log('AccountScreen: Setting last name:', userLastName);
-            setLastName(userLastName);
-          }
-          if (message.data.company) {
-            console.log('AccountScreen: Setting company:', message.data.company);
-            setCompany(message.data.company);
-          }
-          if (message.data.email) {
-            console.log('AccountScreen: Setting email:', message.data.email);
-            setUserEmail(message.data.email);
-          }
-          
-          if (message.data.created_at || message.data.createdAt || message.data.joinedAt) {
-            const dateStr = message.data.created_at || message.data.createdAt || message.data.joinedAt;
-            const date = new Date(dateStr);
-            const formattedDate = date.toLocaleDateString();
-            console.log('AccountScreen: Setting date joined:', formattedDate);
-            setDateJoined(formattedDate);
-          }
-        } else {
-          console.log('AccountScreen: No user data received from WebView');
-        }
-        setIsLoadingProfile(false);
-      } else if (message.type === 'USER_INFO_ERROR') {
-        console.error('AccountScreen: Error from WebView:', message.error);
-        setIsLoadingProfile(false);
-      }
-    } catch (error) {
-      console.error('AccountScreen: Error handling WebView message:', error);
-      setIsLoadingProfile(false);
-    }
-  };
-
   // Calculate display name
-  const displayName = firstName && lastName 
-    ? `${firstName} ${lastName}` 
-    : firstName || lastName || 'User';
+  const displayFirstName = userData.firstName || 'User';
+  const displayLastName = userData.lastName || '';
+  const displayName = displayLastName ? `${displayFirstName} ${displayLastName}` : displayFirstName;
   
-  const initials = firstName && lastName
-    ? `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase()
-    : displayName.charAt(0).toUpperCase();
+  const initials = userData.firstName && userData.lastName
+    ? `${userData.firstName.charAt(0)}${userData.lastName.charAt(0)}`.toUpperCase()
+    : displayFirstName.charAt(0).toUpperCase();
 
   return (
     <SafeAreaView
@@ -295,8 +317,8 @@ export default function AccountScreen() {
             console.log('AccountScreen: Hidden WebView loaded, requesting user info');
             // Request user info after WebView loads
             setTimeout(() => {
-              fetchUserProfile();
-            }, 1000);
+              requestUserInfo();
+            }, 1500);
           }}
           sharedCookiesEnabled={true}
           thirdPartyCookiesEnabled={true}
@@ -312,7 +334,7 @@ export default function AccountScreen() {
       >
         {/* Profile Header */}
         <View style={[styles.profileHeader, { backgroundColor: themeColors.cardBackground || themeColors.card }]}>
-          {isLoadingProfile ? (
+          {isLoading ? (
             <React.Fragment>
               <View style={[styles.avatarCircle, { backgroundColor: colors.ptoGreen + '40' }]}>
                 <ActivityIndicator size="large" color={colors.ptoGreen} />
@@ -331,14 +353,14 @@ export default function AccountScreen() {
               <Text style={[styles.displayName, { color: themeColors.foreground || themeColors.text }]}>
                 {displayName}
               </Text>
-              {company ? (
+              {userData.company ? (
                 <Text style={[styles.companyText, { color: themeColors.mutedText }]}>
-                  {company}
+                  {userData.company}
                 </Text>
               ) : null}
-              {userEmail ? (
+              {userData.email ? (
                 <Text style={[styles.emailText, { color: themeColors.mutedText }]}>
-                  {userEmail}
+                  {userData.email}
                 </Text>
               ) : null}
             </React.Fragment>

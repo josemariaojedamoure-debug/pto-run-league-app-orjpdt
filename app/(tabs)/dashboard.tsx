@@ -112,14 +112,22 @@ export default function DashboardScreen() {
       console.log('Dashboard: Handling share with data:', shareData);
       
       // Check if this is an Instagram share request
-      const isInstagramShare = shareData.url?.includes('instagram') || 
-                               shareData.text?.toLowerCase().includes('instagram');
+      // Look for Instagram in URL, text, or title
+      const shareUrl = shareData.url || '';
+      const shareText = shareData.text || '';
+      const shareTitle = shareData.title || '';
+      
+      const isInstagramShare = 
+        shareUrl.toLowerCase().includes('instagram') || 
+        shareText.toLowerCase().includes('instagram') ||
+        shareTitle.toLowerCase().includes('instagram') ||
+        shareUrl.includes('instagram.com');
       
       if (isInstagramShare) {
         console.log('Dashboard: Instagram share detected, opening Instagram app');
         
-        // Try to open Instagram app
-        const instagramUrl = 'instagram://share';
+        // Try to open Instagram app with stories
+        const instagramUrl = 'instagram://story-camera';
         const canOpen = await Linking.canOpenURL(instagramUrl);
         
         if (canOpen) {
@@ -136,9 +144,9 @@ export default function DashboardScreen() {
         // Use native share sheet for other shares
         console.log('Dashboard: Using native share sheet');
         await Share.share({
-          message: shareData.text || shareData.title || '',
-          url: shareData.url || '',
-          title: shareData.title || '',
+          message: shareText || shareTitle || '',
+          url: shareUrl || '',
+          title: shareTitle || '',
         });
       }
     } catch (error) {
@@ -166,7 +174,7 @@ export default function DashboardScreen() {
     }
 
     // Intercept Instagram URLs and open in Instagram app
-    if (url.startsWith('instagram://') || url.includes('instagram.com/share')) {
+    if (url.startsWith('instagram://') || url.includes('instagram.com/share') || url.includes('instagram.com/stories')) {
       console.log('User attempting to share to Instagram, opening Instagram app');
       
       // Stop the WebView from navigating
@@ -175,7 +183,7 @@ export default function DashboardScreen() {
       }
 
       // Try to open Instagram app directly
-      const instagramUrl = url.startsWith('instagram://') ? url : `instagram://share`;
+      const instagramUrl = url.startsWith('instagram://') ? url : 'instagram://story-camera';
       
       Linking.canOpenURL(instagramUrl).then((supported) => {
         if (supported) {
@@ -239,10 +247,10 @@ export default function DashboardScreen() {
     }
 
     // Intercept Instagram URLs
-    if (url.startsWith('instagram://') || url.includes('instagram.com/share')) {
+    if (url.startsWith('instagram://') || url.includes('instagram.com/share') || url.includes('instagram.com/stories')) {
       console.log('Intercepting Instagram share request');
       
-      const instagramUrl = url.startsWith('instagram://') ? url : `instagram://share`;
+      const instagramUrl = url.startsWith('instagram://') ? url : 'instagram://story-camera';
       
       Linking.canOpenURL(instagramUrl).then((supported) => {
         if (supported) {

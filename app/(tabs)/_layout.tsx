@@ -13,6 +13,9 @@ export default function TabLayout() {
 
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
 
+  // Light greige color for inactive tab text/icons
+  const inactiveColor = effectiveTheme === 'dark' ? '#B8B5AD' : '#9CA3AF';
+
   // Tab labels with translations
   const tabs = [
     { 
@@ -74,6 +77,7 @@ export default function TabLayout() {
                     styles.activeBubble,
                     {
                       backgroundColor: effectiveTheme === 'dark' ? colors.dark.card : '#FFFFFF',
+                      zIndex: 1,
                     }
                   ]} />
                 )}
@@ -81,10 +85,9 @@ export default function TabLayout() {
                   style={[
                     styles.tabLabel,
                     {
-                      color: active
-                        ? colors.ptoGreen
-                        : (themeColors.mutedText || themeColors.secondaryText),
+                      color: active ? colors.ptoGreen : inactiveColor,
                       fontWeight: active ? '600' : '400',
+                      zIndex: 2,
                     },
                   ]}
                 >
@@ -140,13 +143,9 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
-    // Remove zIndex - let natural stacking order work
-    // The bubble is rendered BEFORE the text, so it will be behind
   },
   tabLabel: {
     fontSize: 12,
     fontFamily: 'Helvetica Neue',
-    // Remove zIndex - let natural stacking order work
-    // The text is rendered AFTER the bubble, so it will be in front
   },
 });

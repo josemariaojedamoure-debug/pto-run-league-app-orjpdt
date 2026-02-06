@@ -14,6 +14,9 @@ export default function TabLayout() {
 
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
 
+  // Light greige color for inactive tab text/icons
+  const inactiveColor = effectiveTheme === 'dark' ? '#B8B5AD' : '#9CA3AF';
+
   // Tab labels with translations
   const tabs = [
     { 
@@ -81,23 +84,22 @@ export default function TabLayout() {
                     styles.activeBubble,
                     {
                       backgroundColor: effectiveTheme === 'dark' ? colors.dark.card : '#FFFFFF',
+                      zIndex: 1,
                     }
                   ]} />
                 )}
-                <View style={styles.tabContent}>
+                <View style={[styles.tabContent, { zIndex: 2 }]}>
                   <IconSymbol
                     ios_icon_name={tab.iosIcon}
                     android_material_icon_name={tab.androidIcon}
                     size={24}
-                    color={active ? colors.ptoGreen : (themeColors.mutedText || themeColors.secondaryText)}
+                    color={active ? colors.ptoGreen : inactiveColor}
                   />
                   <Text
                     style={[
                       styles.tabLabel,
                       {
-                        color: active
-                          ? colors.ptoGreen
-                          : (themeColors.mutedText || themeColors.secondaryText),
+                        color: active ? colors.ptoGreen : inactiveColor,
                         fontWeight: active ? '600' : '400',
                       },
                     ]}
@@ -155,14 +157,10 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 8,
     elevation: 4,
-    // Remove zIndex - let natural stacking order work
-    // The bubble is rendered BEFORE the content, so it will be behind
   },
   tabContent: {
     justifyContent: 'center',
     alignItems: 'center',
-    // Remove zIndex - let natural stacking order work
-    // The content is rendered AFTER the bubble, so it will be in front
   },
   tabLabel: {
     fontSize: 12,
