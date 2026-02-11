@@ -152,45 +152,6 @@ export default function AccountScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Notifications */}
-        <TouchableOpacity
-          style={[styles.menuItem, { backgroundColor: themeColors.cardBackground || themeColors.card }]}
-          onPress={() => {
-            console.log('User tapped notifications');
-            router.push('/notifications');
-          }}
-          activeOpacity={0.7}
-        >
-          <View style={styles.menuItemLeft}>
-            <View style={[styles.iconContainer, { backgroundColor: colors.ptoGreen + '20' }]}>
-              <IconSymbol
-                ios_icon_name="bell.fill"
-                android_material_icon_name="notifications"
-                size={20}
-                color={colors.ptoGreen}
-              />
-            </View>
-            <Text style={[styles.menuItemText, { color: themeColors.foreground || themeColors.text }]}>
-              {t.notifications}
-            </Text>
-          </View>
-          <View style={styles.menuItemRight}>
-            {unreadCount > 0 ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>
-                  {unreadCount}
-                </Text>
-              </View>
-            ) : null}
-            <IconSymbol
-              ios_icon_name="chevron.right"
-              android_material_icon_name="arrow-forward"
-              size={20}
-              color={themeColors.mutedText}
-            />
-          </View>
-        </TouchableOpacity>
-
         {/* Settings Section Header */}
         <Text style={[styles.sectionHeader, { color: themeColors.mutedText }]}>
           {t.settings}
@@ -313,6 +274,45 @@ export default function AccountScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {/* Notifications - Now under Settings */}
+        <TouchableOpacity
+          style={[styles.menuItem, { backgroundColor: themeColors.cardBackground || themeColors.card }]}
+          onPress={() => {
+            console.log('User tapped notifications');
+            router.push('/notifications');
+          }}
+          activeOpacity={0.7}
+        >
+          <View style={styles.menuItemLeft}>
+            <View style={[styles.iconContainer, { backgroundColor: colors.ptoGreen + '20' }]}>
+              <IconSymbol
+                ios_icon_name="bell.fill"
+                android_material_icon_name="notifications"
+                size={20}
+                color={colors.ptoGreen}
+              />
+            </View>
+            <Text style={[styles.menuItemText, { color: themeColors.foreground || themeColors.text }]}>
+              {t.notifications}
+            </Text>
+          </View>
+          <View style={styles.menuItemRight}>
+            {unreadCount > 0 ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {unreadCount}
+                </Text>
+              </View>
+            ) : null}
+            <IconSymbol
+              ios_icon_name="chevron.right"
+              android_material_icon_name="arrow-forward"
+              size={20}
+              color={themeColors.mutedText}
+            />
+          </View>
+        </TouchableOpacity>
 
         {/* Links Section Header */}
         <Text style={[styles.sectionHeader, { color: themeColors.mutedText }]}>
