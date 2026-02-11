@@ -77,7 +77,6 @@ export default function TabLayout() {
                     styles.activeBubble,
                     {
                       backgroundColor: effectiveTheme === 'dark' ? colors.dark.card : '#FFFFFF',
-                      zIndex: 1,
                     }
                   ]} />
                 )}
@@ -87,7 +86,6 @@ export default function TabLayout() {
                     {
                       color: active ? colors.ptoGreen : inactiveColor,
                       fontWeight: active ? '600' : '400',
-                      zIndex: 2,
                     },
                   ]}
                 >
@@ -124,12 +122,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 8,
+    overflow: 'visible',
   },
   tabButtonContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+    overflow: 'visible',
   },
   activeBubble: {
     position: 'absolute',
@@ -147,5 +147,7 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 12,
     fontFamily: 'Helvetica Neue',
+    position: 'relative',
+    zIndex: 10,
   },
 });

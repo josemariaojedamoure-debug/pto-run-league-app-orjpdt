@@ -27,30 +27,14 @@ export default function AccountScreen() {
   const router = useRouter();
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
   
-  // User profile state
-  const [userData, setUserData] = useState<{
-    firstName: string | null;
-    lastName: string | null;
-    email: string | null;
-    company?: string | null;
-  }>({
-    firstName: null,
-    lastName: null,
-    email: null,
-    company: null,
-  });
-  const [isLoading, setIsLoading] = useState(true);
-  
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const webViewRef = useRef<WebView>(null);
-  const userInfoTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   console.log('AccountScreen - Theme:', theme, 'Effective:', effectiveTheme, 'Language:', language);
 
   // Translations
   const translations = {
     en: {
-      loading: 'Loading...',
       notifications: 'Notifications',
       settings: 'SETTINGS',
       theme: 'Theme',
@@ -70,7 +54,6 @@ export default function AccountScreen() {
       version: 'Version',
     },
     fr: {
-      loading: 'Chargement...',
       notifications: 'Notifications',
       settings: 'PARAMÈTRES',
       theme: 'Thème',
@@ -92,152 +75,6 @@ export default function AccountScreen() {
   };
 
   const t = translations[language];
-
-  // Request user info from WebView
-  const requestUserInfo = useCallback(() => {
-    if (!webViewRef.current) {
-      console.log('AccountScreen: WebView ref not available yet');
-      return;
-    }
-
-    console.log('AccountScreen: Requesting user info from WebView');
-    
-    const script = `
-      (function() {
-        try {
-          let userData = null;
-          
-          // Try multiple possible localStorage keys
-          const possibleKeys = ['user_data', 'userData', 'currentUser', 'user', 'auth_user'];
-          for (const key of possibleKeys) {
-            const data = localStorage.getItem(key);
-            if (data) {
-              try {
-                userData = JSON.parse(data);
-                console.log('[Account WebView] Found user data in localStorage key:', key);
-                break;
-              } catch (e) {
-                console.log('[Account WebView] Failed to parse data from key:', key);
-              }
-            }
-          }
-          
-          // If no localStorage data, try window object
-          if (!userData && window.currentUser) {
-            userData = window.currentUser;
-            console.log('[Account WebView] Found user data in window.currentUser');
-          }
-          
-          // Send user data to native app
-          if (userData && window.ReactNativeWebView) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'USER_INFO',
-              data: userData
-            }));
-            console.log('[Account WebView] Sent user data to native app');
-          } else {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'USER_INFO_NOT_FOUND'
-            }));
-            console.log('[Account WebView] No user data found');
-          }
-        } catch (e) {
-          console.error('[Account WebView] Error getting user info:', e);
-          window.ReactNativeWebView.postMessage(JSON.stringify({
-            type: 'USER_INFO_ERROR',
-            error: e.message
-          }));
-        }
-      })();
-      true;
-    `;
-    
-    webViewRef.current.injectJavaScript(script);
-    
-    // Set a timeout to stop loading if no response
-    if (userInfoTimeoutRef.current) {
-      clearTimeout(userInfoTimeoutRef.current);
-    }
-    userInfoTimeoutRef.current = setTimeout(() => {
-      console.log('AccountScreen: User info request timed out');
-      setIsLoading(false);
-    }, 5000);
-  }, []);
-
-  // Handle messages from WebView
-  const handleWebViewMessage = useCallback((event: WebViewMessageEvent) => {
-    try {
-      const message = JSON.parse(event.nativeEvent.data);
-      console.log('AccountScreen: Received message from WebView:', message.type);
-
-      if (message.type === 'USER_INFO' && message.data) {
-        console.log('AccountScreen: Received user info:', message.data);
-        
-        // Parse user data - handle various possible formats
-        let parsedData = message.data;
-        if (typeof parsedData === 'string') {
-          try {
-            parsedData = JSON.parse(parsedData);
-          } catch (e) {
-            console.error('AccountScreen: Failed to parse user data string:', e);
-          }
-        }
-        
-        // Extract user information with multiple fallbacks
-        const firstName = parsedData.first_name || 
-                         parsedData.firstName || 
-                         parsedData.given_name ||
-                         (parsedData.name ? parsedData.name.split(' ')[0] : null);
-        
-        const lastName = parsedData.last_name || 
-                        parsedData.lastName || 
-                        parsedData.family_name ||
-                        (parsedData.name ? parsedData.name.split(' ').slice(1).join(' ') : null);
-        
-        const email = parsedData.email || parsedData.emailAddress || null;
-        const company = parsedData.company || parsedData.organization || null;
-        
-        console.log('AccountScreen: Extracted user data - firstName:', firstName, 'lastName:', lastName, 'email:', email);
-        
-        setUserData({
-          firstName,
-          lastName,
-          email,
-          company,
-        });
-        setIsLoading(false);
-        
-        // Clear timeout
-        if (userInfoTimeoutRef.current) {
-          clearTimeout(userInfoTimeoutRef.current);
-        }
-      } else if (message.type === 'USER_INFO_NOT_FOUND') {
-        console.log('AccountScreen: No user data found in WebView');
-        setIsLoading(false);
-        if (userInfoTimeoutRef.current) {
-          clearTimeout(userInfoTimeoutRef.current);
-        }
-      } else if (message.type === 'USER_INFO_ERROR') {
-        console.error('AccountScreen: Error from WebView:', message.error);
-        setIsLoading(false);
-        if (userInfoTimeoutRef.current) {
-          clearTimeout(userInfoTimeoutRef.current);
-        }
-      }
-    } catch (error) {
-      console.error('AccountScreen: Error handling WebView message:', error);
-      setIsLoading(false);
-    }
-  }, []);
-
-  // Cleanup timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (userInfoTimeoutRef.current) {
-        clearTimeout(userInfoTimeoutRef.current);
-      }
-    };
-  }, []);
 
   const handleThemeChange = (mode: 'light' | 'dark') => {
     console.log('User changed theme to:', mode);
@@ -293,33 +130,16 @@ export default function AccountScreen() {
     router.replace('/auth');
   };
 
-  // Calculate display name
-  const displayFirstName = userData.firstName || 'User';
-  const displayLastName = userData.lastName || '';
-  const displayName = displayLastName ? `${displayFirstName} ${displayLastName}` : displayFirstName;
-  
-  const initials = userData.firstName && userData.lastName
-    ? `${userData.firstName.charAt(0)}${userData.lastName.charAt(0)}`.toUpperCase()
-    : displayFirstName.charAt(0).toUpperCase();
-
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: themeColors.background }]}
       edges={['top']}
     >
-      {/* Hidden WebView to communicate with web app */}
+      {/* Hidden WebView to maintain session */}
       <View style={{ height: 0, width: 0, overflow: 'hidden' }}>
         <WebView
           ref={webViewRef}
           source={{ uri: `${BASE_URL}/${language}/participant?source=app` }}
-          onMessage={handleWebViewMessage}
-          onLoadEnd={() => {
-            console.log('AccountScreen: Hidden WebView loaded, requesting user info');
-            // Request user info after WebView loads
-            setTimeout(() => {
-              requestUserInfo();
-            }, 1500);
-          }}
           sharedCookiesEnabled={true}
           thirdPartyCookiesEnabled={true}
           javaScriptEnabled={true}
@@ -332,41 +152,6 @@ export default function AccountScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Profile Header */}
-        <View style={[styles.profileHeader, { backgroundColor: themeColors.cardBackground || themeColors.card }]}>
-          {isLoading ? (
-            <React.Fragment>
-              <View style={[styles.avatarCircle, { backgroundColor: colors.ptoGreen + '40' }]}>
-                <ActivityIndicator size="large" color={colors.ptoGreen} />
-              </View>
-              <Text style={[styles.displayName, { color: themeColors.foreground || themeColors.text, opacity: 0.5 }]}>
-                {t.loading}
-              </Text>
-            </React.Fragment>
-          ) : (
-            <React.Fragment>
-              <View style={[styles.avatarCircle, { backgroundColor: colors.ptoGreen }]}>
-                <Text style={styles.avatarText}>
-                  {initials}
-                </Text>
-              </View>
-              <Text style={[styles.displayName, { color: themeColors.foreground || themeColors.text }]}>
-                {displayName}
-              </Text>
-              {userData.company ? (
-                <Text style={[styles.companyText, { color: themeColors.mutedText }]}>
-                  {userData.company}
-                </Text>
-              ) : null}
-              {userData.email ? (
-                <Text style={[styles.emailText, { color: themeColors.mutedText }]}>
-                  {userData.email}
-                </Text>
-              ) : null}
-            </React.Fragment>
-          )}
-        </View>
-
         {/* Notifications */}
         <TouchableOpacity
           style={[styles.menuItem, { backgroundColor: themeColors.cardBackground || themeColors.card }]}
@@ -668,52 +453,6 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     paddingBottom: 100, // Extra padding for tab bar
   },
-  profileHeader: {
-    borderRadius: spacing.borderRadius,
-    padding: spacing.xl,
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  avatarCircle: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  avatarText: {
-    fontSize: 40,
-    fontFamily: typography.bold,
-    color: '#FFFFFF',
-  },
-  displayName: {
-    fontSize: 28,
-    fontFamily: typography.bold,
-    marginBottom: 6,
-    letterSpacing: -0.5,
-  },
-  companyText: {
-    fontSize: 16,
-    fontFamily: typography.medium,
-    marginBottom: 4,
-    opacity: 0.8,
-  },
-  emailText: {
-    fontSize: 14,
-    fontFamily: typography.regular,
-    opacity: 0.6,
-  },
   sectionHeader: {
     fontSize: 13,
     fontFamily: typography.bold,
@@ -729,7 +468,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     padding: spacing.md,
     borderRadius: spacing.borderRadius,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,

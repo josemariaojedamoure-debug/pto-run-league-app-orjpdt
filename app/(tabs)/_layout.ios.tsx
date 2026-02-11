@@ -84,11 +84,10 @@ export default function TabLayout() {
                     styles.activeBubble,
                     {
                       backgroundColor: effectiveTheme === 'dark' ? colors.dark.card : '#FFFFFF',
-                      zIndex: 1,
                     }
                   ]} />
                 )}
-                <View style={[styles.tabContent, { zIndex: 2 }]}>
+                <View style={styles.tabContent}>
                   <IconSymbol
                     ios_icon_name={tab.iosIcon}
                     android_material_icon_name={tab.androidIcon}
@@ -138,12 +137,14 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 12,
     elevation: 8,
+    overflow: 'visible',
   },
   tabButtonContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     position: 'relative',
+    overflow: 'visible',
   },
   activeBubble: {
     position: 'absolute',
@@ -161,6 +162,8 @@ const styles = StyleSheet.create({
   tabContent: {
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
+    zIndex: 10,
   },
   tabLabel: {
     fontSize: 12,
