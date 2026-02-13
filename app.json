@@ -38,7 +38,6 @@
             }
           }
         },
-        "NSUserTrackingUsageDescription": "This app uses tracking to provide personalized running insights and improve your experience.",
         "NSLocationWhenInUseUsageDescription": "We need your location to track your running activities and show nearby races.",
         "NSPhotoLibraryUsageDescription": "We need access to your photo library to let you upload profile pictures.",
         "NSCameraUsageDescription": "We need camera access to let you take profile pictures.",
