@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
 import { WebView, WebViewMessageEvent, WebViewNavigation } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -31,7 +31,7 @@ export default function AuthScreen() {
   }, []);
 
   // Handle navigation state changes
-  const handleNavigationStateChange = async (navState: WebViewNavigation) => {
+  const handleNavigationStateChange = useCallback((navState: WebViewNavigation) => {
     const url = navState.url;
     console.log('AuthScreen: WebView navigated to:', url);
 
@@ -39,8 +39,8 @@ export default function AuthScreen() {
     // Don't intercept or redirect - the web app will handle the onboarding
     if (url.includes('/get-access')) {
       console.log('AuthScreen: User navigated to /get-access - allowing WebView to handle sign up flow');
-      setIsLoading(false); // Ensure loading state is cleared
-      return true;
+      setIsLoading(false); // Ensure loading state is cleared so content is visible
+      return;
     }
 
     // Check if this is an authenticated page (participant, dashboard, rankings, etc.)
@@ -68,22 +68,50 @@ export default function AuthScreen() {
         router.replace('/(tabs)/dashboard');
       }, 5000);
     }
-  };
+  }, [isCheckingAuth, router]);
 
   // Handle WebView requests to intercept before navigation
-  const handleShouldStartLoadWithRequest = (request: any) => {
+  const handleShouldStartLoadWithRequest = useCallback((request: any) => {
     const url = request.url;
     console.log('AuthScreen: Should start load with request:', url);
 
     // Allow navigation to /get-access (sign up flow)
     if (url.includes('/get-access')) {
       console.log('AuthScreen: Allowing navigation to /get-access');
+      setIsLoading(false); // Clear loading immediately when navigating to get-access
       return true;
     }
 
     // Allow all other requests
     return true;
-  };
+  }, []);
+
+  // Handle load start
+  const handleLoadStart = useCallback(() => {
+    console.log('WebView started loading auth page');
+    setIsLoading(true);
+  }, []);
+
+  // Handle load end
+  const handleLoadEnd = useCallback((navState: WebViewNavigation) => {
+    console.log('WebView finished loading auth page');
+    const url = navState.url;
+    
+    // If we're on /get-access, ensure loading is cleared
+    if (url.includes('/get-access')) {
+      console.log('AuthScreen: Finished loading /get-access - clearing loading state');
+      setIsLoading(false);
+    } else {
+      setIsLoading(false);
+    }
+  }, []);
+
+  // Handle errors
+  const handleError = useCallback((syntheticEvent: any) => {
+    const { nativeEvent } = syntheticEvent;
+    console.error('WebView error loading auth page:', nativeEvent);
+    setIsLoading(false);
+  }, []);
 
   // Build the auth URL
   const authUrl = `${BASE_URL}/auth?source=app`;
@@ -116,36 +144,16 @@ export default function AuthScreen() {
         ref={webViewRef}
         source={{ uri: authUrl }}
         style={styles.webview}
-        startInLoadingState={true}
-        renderLoading={() => (
-          <View style={[styles.loadingContainer, { backgroundColor: themeColors.background }]}>
-            <ActivityIndicator size="large" color={colors.ptoGreen} />
-            <Text style={[styles.loadingText, { color: themeColors.text }]}>
-              Loading...
-            </Text>
-          </View>
-        )}
-        onLoadStart={() => {
-          console.log('WebView started loading auth page');
-          setIsLoading(true);
-        }}
-        onLoadEnd={() => {
-          console.log('WebView finished loading auth page');
-          setIsLoading(false);
-        }}
-        onError={(syntheticEvent) => {
-          const { nativeEvent } = syntheticEvent;
-          console.error('WebView error loading auth page:', nativeEvent);
-          setIsLoading(false);
-        }}
+        startInLoadingState={false}
+        onLoadStart={handleLoadStart}
+        onLoadEnd={handleLoadEnd}
+        onError={handleError}
         onNavigationStateChange={handleNavigationStateChange}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
         sharedCookiesEnabled={true}
         thirdPartyCookiesEnabled={true}
         javaScriptEnabled={true}
         domStorageEnabled={true}
-        // Ensure WebView is visible and not blocked
-        opacity={isLoading ? 0 : 1}
       />
       {isLoading && (
         <View style={[styles.loadingOverlay, { backgroundColor: themeColors.background }]}>
