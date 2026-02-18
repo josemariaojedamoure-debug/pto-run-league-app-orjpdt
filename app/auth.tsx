@@ -15,10 +15,11 @@ export default function AuthScreen() {
   const webViewRef = useRef<WebView>(null);
   const themeColors = effectiveTheme === 'dark' ? colors.dark : colors.light;
   const [isCheckingAuth, setIsCheckingAuth] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const hasAttemptedAuthRef = useRef(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  console.log('AuthScreen - Checking:', isCheckingAuth);
+  console.log('AuthScreen - Checking:', isCheckingAuth, 'Loading:', isLoading);
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -38,6 +39,7 @@ export default function AuthScreen() {
     // Don't intercept or redirect - the web app will handle the onboarding
     if (url.includes('/get-access')) {
       console.log('AuthScreen: User navigated to /get-access - allowing WebView to handle sign up flow');
+      setIsLoading(false); // Ensure loading state is cleared
       return true;
     }
 
@@ -125,13 +127,16 @@ export default function AuthScreen() {
         )}
         onLoadStart={() => {
           console.log('WebView started loading auth page');
+          setIsLoading(true);
         }}
         onLoadEnd={() => {
           console.log('WebView finished loading auth page');
+          setIsLoading(false);
         }}
         onError={(syntheticEvent) => {
           const { nativeEvent } = syntheticEvent;
           console.error('WebView error loading auth page:', nativeEvent);
+          setIsLoading(false);
         }}
         onNavigationStateChange={handleNavigationStateChange}
         onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
@@ -139,7 +144,17 @@ export default function AuthScreen() {
         thirdPartyCookiesEnabled={true}
         javaScriptEnabled={true}
         domStorageEnabled={true}
+        // Ensure WebView is visible and not blocked
+        opacity={isLoading ? 0 : 1}
       />
+      {isLoading && (
+        <View style={[styles.loadingOverlay, { backgroundColor: themeColors.background }]}>
+          <ActivityIndicator size="large" color={colors.ptoGreen} />
+          <Text style={[styles.loadingText, { color: themeColors.text }]}>
+            Loading...
+          </Text>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -153,6 +168,15 @@ const styles = StyleSheet.create({
   },
   loadingContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
   },
