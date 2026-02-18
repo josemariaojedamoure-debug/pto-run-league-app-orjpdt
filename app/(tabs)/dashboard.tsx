@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { View, StyleSheet, ActivityIndicator, Platform, Linking, Alert, Text, Share } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { WebView, WebViewNavigationEvent } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
 import { colors, typography } from '@/styles/commonStyles';
@@ -305,6 +305,26 @@ export default function DashboardScreen() {
     return true;
   };
 
+  // Handle load end - FIXED to properly read URL from event.nativeEvent
+  const handleLoadEnd = (event: WebViewNavigationEvent) => {
+    const url = event.nativeEvent?.url;
+    console.log('Dashboard WebView finished loading, URL:', url);
+    
+    // Guard against undefined url
+    if (!url) {
+      console.warn('Dashboard: URL is undefined in load end, clearing loading state');
+      setIsWebViewLoading(false);
+      return;
+    }
+    
+    setIsWebViewLoading(false);
+    
+    // Re-inject theme after page load to ensure it's applied
+    if (webViewRef.current) {
+      webViewRef.current.injectJavaScript(injectedJavaScript);
+    }
+  };
+
   if (!webViewUrl) {
     return (
       <SafeAreaView
@@ -348,15 +368,7 @@ export default function DashboardScreen() {
             console.log('Dashboard WebView started loading:', webViewUrl);
             setIsWebViewLoading(true);
           }}
-          onLoadEnd={() => {
-            console.log('Dashboard WebView finished loading');
-            setIsWebViewLoading(false);
-            
-            // Re-inject theme after page load to ensure it's applied
-            if (webViewRef.current) {
-              webViewRef.current.injectJavaScript(injectedJavaScript);
-            }
-          }}
+          onLoadEnd={handleLoadEnd}
           onError={(syntheticEvent) => {
             const { nativeEvent } = syntheticEvent;
             console.error('Dashboard WebView error:', nativeEvent);

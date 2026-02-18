@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { View, StyleSheet, ActivityIndicator, Text } from 'react-native';
-import { WebView, WebViewMessageEvent, WebViewNavigation } from 'react-native-webview';
+import { WebView, WebViewMessageEvent, WebViewNavigation, WebViewNavigationEvent } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTheme } from '@/contexts/ThemeContext';
@@ -104,14 +104,14 @@ export default function AuthScreen() {
     setIsLoading(true);
   }, []);
 
-  // Handle load end
-  const handleLoadEnd = useCallback((navState: WebViewNavigation) => {
-    console.log('WebView finished loading auth page');
-    const url = navState.url;
+  // Handle load end - FIXED to properly read URL from event.nativeEvent
+  const handleLoadEnd = useCallback((event: WebViewNavigationEvent) => {
+    const url = event.nativeEvent?.url;
+    console.log('WebView finished loading auth page, URL:', url);
     
     // Guard against undefined url
     if (!url) {
-      console.log('AuthScreen: URL is undefined in load end, clearing loading state');
+      console.warn('AuthScreen: URL is undefined in load end, clearing loading state');
       setIsLoading(false);
       return;
     }

@@ -1,7 +1,7 @@
 
 import React, { useRef, useState, useEffect } from 'react';
 import { View, StyleSheet, ActivityIndicator, Platform, Linking, Alert, Text, Share } from 'react-native';
-import { WebView } from 'react-native-webview';
+import { WebView, WebViewNavigationEvent } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
 import { colors, typography } from '@/styles/commonStyles';
@@ -281,6 +281,26 @@ export default function RankingsScreen() {
     return true;
   };
 
+  // Handle load end - FIXED to properly read URL from event.nativeEvent
+  const handleLoadEnd = (event: WebViewNavigationEvent) => {
+    const url = event.nativeEvent?.url;
+    console.log('Rankings WebView finished loading, URL:', url);
+    
+    // Guard against undefined url
+    if (!url) {
+      console.warn('Rankings: URL is undefined in load end, clearing loading state');
+      setIsWebViewLoading(false);
+      return;
+    }
+    
+    setIsWebViewLoading(false);
+    
+    // Re-inject theme after page load to ensure it's applied
+    if (webViewRef.current) {
+      webViewRef.current.injectJavaScript(injectedJavaScript);
+    }
+  };
+
   if (!webViewUrl) {
     return (
       <SafeAreaView
@@ -324,15 +344,7 @@ export default function RankingsScreen() {
             console.log('Rankings WebView started loading:', webViewUrl);
             setIsWebViewLoading(true);
           }}
-          onLoadEnd={() => {
-            console.log('Rankings WebView finished loading');
-            setIsWebViewLoading(false);
-            
-            // Re-inject theme after page load to ensure it's applied
-            if (webViewRef.current) {
-              webViewRef.current.injectJavaScript(injectedJavaScript);
-            }
-          }}
+          onLoadEnd={handleLoadEnd}
           onError={(syntheticEvent) => {
             const { nativeEvent } = syntheticEvent;
             console.error('Rankings WebView error:', nativeEvent);
