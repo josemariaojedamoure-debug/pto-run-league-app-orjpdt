@@ -120,8 +120,66 @@ export default function AuthScreen() {
     if (url.includes('/get-access')) {
       console.log('AuthScreen: Finished loading /get-access - clearing loading state');
       setIsLoading(false);
+      
+      // Inject diagnostic JavaScript to check if content is actually rendered
+      webViewRef.current?.injectJavaScript(`
+        (function() {
+          const bodyHeight = document.body.scrollHeight;
+          const bodyContent = document.body.innerText.substring(0, 200);
+          const visibleElements = document.querySelectorAll('*:not(script):not(style)').length;
+          
+          console.log('🔍 /get-access Page Diagnostics:');
+          console.log('  - Body height:', bodyHeight, 'px');
+          console.log('  - Visible elements:', visibleElements);
+          console.log('  - First 200 chars:', bodyContent);
+          console.log('  - Background color:', window.getComputedStyle(document.body).backgroundColor);
+          console.log('  - Text color:', window.getComputedStyle(document.body).color);
+          
+          window.ReactNativeWebView.postMessage(JSON.stringify({
+            type: 'PAGE_DIAGNOSTICS',
+            url: window.location.href,
+            bodyHeight: bodyHeight,
+            visibleElements: visibleElements,
+            bodyContent: bodyContent,
+            backgroundColor: window.getComputedStyle(document.body).backgroundColor,
+            textColor: window.getComputedStyle(document.body).color
+          }));
+        })();
+        true;
+      `);
     } else {
       setIsLoading(false);
+    }
+  }, []);
+
+  // Handle WebView messages (for diagnostics)
+  const handleMessage = useCallback((event: WebViewMessageEvent) => {
+    try {
+      const data = JSON.parse(event.nativeEvent.data);
+      
+      if (data.type === 'PAGE_DIAGNOSTICS') {
+        console.log('📊 WebView Page Diagnostics Received:');
+        console.log('  URL:', data.url);
+        console.log('  Body Height:', data.bodyHeight, 'px');
+        console.log('  Visible Elements:', data.visibleElements);
+        console.log('  Background Color:', data.backgroundColor);
+        console.log('  Text Color:', data.textColor);
+        console.log('  Content Preview:', data.bodyContent);
+        
+        // Alert if page appears empty
+        if (data.bodyHeight < 100 || data.visibleElements < 5) {
+          console.warn('⚠️ WARNING: /get-access page appears to have minimal content!');
+          console.warn('   This suggests the web page itself may not be rendering properly.');
+        }
+        
+        // Alert if colors might be causing invisibility
+        if (data.backgroundColor === data.textColor) {
+          console.warn('⚠️ WARNING: Background and text colors are the same!');
+          console.warn('   Content may be invisible due to color mismatch.');
+        }
+      }
+    } catch (error) {
+      console.log('WebView message (non-JSON):', event.nativeEvent.data);
     }
   }, []);
 
@@ -159,21 +217,26 @@ export default function AuthScreen() {
       style={[styles.container, { backgroundColor: themeColors.background }]}
       edges={['top', 'bottom']}
     >
-      <WebView
-        ref={webViewRef}
-        source={{ uri: authUrl }}
-        style={styles.webview}
-        startInLoadingState={false}
-        onLoadStart={handleLoadStart}
-        onLoadEnd={handleLoadEnd}
-        onError={handleError}
-        onNavigationStateChange={handleNavigationStateChange}
-        onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
-        sharedCookiesEnabled={true}
-        thirdPartyCookiesEnabled={true}
-        javaScriptEnabled={true}
-        domStorageEnabled={true}
-      />
+      <View style={styles.webviewContainer}>
+        <WebView
+          ref={webViewRef}
+          source={{ uri: authUrl }}
+          style={[styles.webview, { opacity: isLoading ? 0 : 1 }]}
+          startInLoadingState={false}
+          onLoadStart={handleLoadStart}
+          onLoadEnd={handleLoadEnd}
+          onError={handleError}
+          onMessage={handleMessage}
+          onNavigationStateChange={handleNavigationStateChange}
+          onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
+          sharedCookiesEnabled={true}
+          thirdPartyCookiesEnabled={true}
+          javaScriptEnabled={true}
+          domStorageEnabled={true}
+          allowsInlineMediaPlayback={true}
+          mediaPlaybackRequiresUserAction={false}
+        />
+      </View>
       {isLoading && (
         <View style={[styles.loadingOverlay, { backgroundColor: themeColors.background }]}>
           <ActivityIndicator size="large" color={colors.ptoGreen} />
@@ -190,8 +253,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  webviewContainer: {
+    flex: 1,
+  },
   webview: {
     flex: 1,
+    backgroundColor: 'transparent',
   },
   loadingContainer: {
     flex: 1,
@@ -206,6 +273,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
+    zIndex: 1000,
   },
   loadingText: {
     marginTop: 16,
