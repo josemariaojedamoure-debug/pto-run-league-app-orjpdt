@@ -35,6 +35,12 @@ export default function AuthScreen() {
     const url = navState.url;
     console.log('AuthScreen: WebView navigated to:', url);
 
+    // Guard against undefined url
+    if (!url) {
+      console.log('AuthScreen: URL is undefined, skipping navigation check');
+      return;
+    }
+
     // If user navigates to /get-access (sign up flow), let the WebView handle it
     // Don't intercept or redirect - the web app will handle the onboarding
     if (url.includes('/get-access')) {
@@ -75,6 +81,12 @@ export default function AuthScreen() {
     const url = request.url;
     console.log('AuthScreen: Should start load with request:', url);
 
+    // Guard against undefined url
+    if (!url) {
+      console.log('AuthScreen: URL is undefined, allowing request');
+      return true;
+    }
+
     // Allow navigation to /get-access (sign up flow)
     if (url.includes('/get-access')) {
       console.log('AuthScreen: Allowing navigation to /get-access');
@@ -96,6 +108,13 @@ export default function AuthScreen() {
   const handleLoadEnd = useCallback((navState: WebViewNavigation) => {
     console.log('WebView finished loading auth page');
     const url = navState.url;
+    
+    // Guard against undefined url
+    if (!url) {
+      console.log('AuthScreen: URL is undefined in load end, clearing loading state');
+      setIsLoading(false);
+      return;
+    }
     
     // If we're on /get-access, ensure loading is cleared
     if (url.includes('/get-access')) {

@@ -137,6 +137,13 @@ export default function RankingsScreen() {
     
     const url = navState.url;
 
+    // Guard against undefined url
+    if (!url) {
+      console.log('Rankings: URL is undefined, skipping navigation check');
+      setIsWebViewLoading(navState.loading);
+      return true;
+    }
+
     // Update loading state
     setIsWebViewLoading(navState.loading);
 
@@ -214,6 +221,12 @@ export default function RankingsScreen() {
   const handleShouldStartLoadWithRequest = (request: any) => {
     const url = request.url;
     console.log('Rankings WebView should start load with request:', url);
+
+    // Guard against undefined url
+    if (!url) {
+      console.log('Rankings: URL is undefined in request, allowing');
+      return true;
+    }
 
     // If the web app redirects to /auth, redirect to native auth screen
     if (url.includes('/auth') && url.includes('source=app')) {
