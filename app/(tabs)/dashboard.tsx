@@ -1,7 +1,7 @@
 
 import React, { useRef, useEffect, useState } from 'react';
 import { View, StyleSheet, ActivityIndicator, Platform, Linking, Alert, Text, Share } from 'react-native';
-import { WebView, WebViewNavigationEvent } from 'react-native-webview';
+import { WebView, WebViewNavigationEvent, WebViewNavigation } from 'react-native-webview';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '@/contexts/ThemeContext';
 import { colors, typography } from '@/styles/commonStyles';
@@ -156,10 +156,9 @@ export default function DashboardScreen() {
   };
 
   // Handle navigation state changes to intercept special URLs
-  const handleNavigationStateChange = (navState: any) => {
-    console.log('Dashboard WebView navigation:', navState.url);
-    
+  const handleNavigationStateChange = (navState: WebViewNavigation) => {
     const url = navState.url;
+    console.log('Dashboard WebView navigation:', url);
 
     // Guard against undefined url
     if (!url) {
