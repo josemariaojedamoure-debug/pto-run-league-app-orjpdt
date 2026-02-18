@@ -34,13 +34,22 @@ export default function AuthScreen() {
     const url = navState.url;
     console.log('AuthScreen: WebView navigated to:', url);
 
+    // If user navigates to /get-access (sign up flow), let the WebView handle it
+    // Don't intercept or redirect - the web app will handle the onboarding
+    if (url.includes('/get-access')) {
+      console.log('AuthScreen: User navigated to /get-access - allowing WebView to handle sign up flow');
+      return true;
+    }
+
     // Check if this is an authenticated page (participant, dashboard, rankings, etc.)
+    // But NOT /get-access which is part of the sign up flow
     const isAuthenticatedPage = 
-      url.includes('/participant') || 
-      url.includes('/dashboard') || 
-      url.includes('/rankings') ||
-      url.includes('/profile') ||
-      url.includes('/events');
+      (url.includes('/participant') || 
+       url.includes('/dashboard') || 
+       url.includes('/rankings') ||
+       url.includes('/profile') ||
+       url.includes('/events')) &&
+      !url.includes('/get-access');
     
     // Only attempt auth transfer once per session
     if (isAuthenticatedPage && !isCheckingAuth && !hasAttemptedAuthRef.current) {
@@ -57,6 +66,21 @@ export default function AuthScreen() {
         router.replace('/(tabs)/dashboard');
       }, 5000);
     }
+  };
+
+  // Handle WebView requests to intercept before navigation
+  const handleShouldStartLoadWithRequest = (request: any) => {
+    const url = request.url;
+    console.log('AuthScreen: Should start load with request:', url);
+
+    // Allow navigation to /get-access (sign up flow)
+    if (url.includes('/get-access')) {
+      console.log('AuthScreen: Allowing navigation to /get-access');
+      return true;
+    }
+
+    // Allow all other requests
+    return true;
   };
 
   // Build the auth URL
@@ -110,6 +134,7 @@ export default function AuthScreen() {
           console.error('WebView error loading auth page:', nativeEvent);
         }}
         onNavigationStateChange={handleNavigationStateChange}
+        onShouldStartLoadWithRequest={handleShouldStartLoadWithRequest}
         sharedCookiesEnabled={true}
         thirdPartyCookiesEnabled={true}
         javaScriptEnabled={true}
